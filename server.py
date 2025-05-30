@@ -18,7 +18,7 @@ if module_path not in sys.path:
 from functions import make_circ_animation_frames
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://jellesombekke.github.io/Draw2Relax/"])
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
@@ -31,10 +31,6 @@ class IgnoreGetBreathingDataFilter(logging.Filter):
 # Set up the custom log filter
 log = logging.getLogger('werkzeug')
 log.addFilter(IgnoreGetBreathingDataFilter())
-
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
 
 @app.route('/process', methods=['POST'])
 def process_image():
@@ -53,8 +49,8 @@ def process_image():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # image saving
-        # os.makedirs('drawings', exist_ok=True)
-        # gray_img.save(f'drawings/drawing_{timestamp}.png')
+        os.makedirs('drawings', exist_ok=True)
+        gray_img.save(f'drawings/drawing_{timestamp}.png')
 
         # Run your processing pipeline
         base64_frames, file_path_list= run_pipeline(img, timestamp)
@@ -110,11 +106,10 @@ def run_pipeline(img, timestamp):
     growth_constant = 15000
 
     # Load the model once (outside of your draw loop)
-    model = YOLO("../circle_detection_model/runs/segment/train2/weights/best.pt")
-    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, project="../circle_detection_model/runs/segment", name="", exist_ok=True)
+    model = YOLO("../trained_model/weights/best.pt")
+    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, name="", exist_ok=True)
     padding = 5
     circular_structures = []
-
 
     for r in results:
 
