@@ -18,7 +18,7 @@ if module_path not in sys.path:
 from functions import make_circ_animation_frames
 
 app = Flask(__name__)
-CORS(app, origins=["https://jellesombekke.github.io/Draw2Relax/"])
+CORS(app, origins=["https://jellesombekke.github.io"])
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
