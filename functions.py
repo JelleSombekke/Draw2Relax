@@ -251,7 +251,7 @@ def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constan
 
     # Iterate over different descriptor counts
     for i, desc in enumerate(descriptor_values):
-
+        print(f"Frame number: {i}")
         img_warped, _, _ = compute_displacement_fields(img, circles_structures, scale[i], falloff=2.5)
 
         reconstructed_contours = calculate_contours(img_warped, desc, growth_constant, mode=None)
