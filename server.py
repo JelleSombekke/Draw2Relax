@@ -1,4 +1,5 @@
 from flask import Flask, request, send_file, send_from_directory, jsonify
+from flask_cors import CORS
 import numpy as np
 import base64
 from io import BytesIO
@@ -17,6 +18,7 @@ if module_path not in sys.path:
 from functions import make_circ_animation_frames
 
 app = Flask(__name__)
+CORS(app)
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):

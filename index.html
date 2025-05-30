@@ -307,7 +307,7 @@ window.addEventListener("beforeunload", (event) => {
     }
 
     if (breathingSensorActive){
-        fetch('/stop-sensor', {
+        fetch('https://draw2relax-backend.onrender.com/stop-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -412,7 +412,7 @@ document.addEventListener('fullscreenchange', () => {
 
 // Function to fetch sensor data from the Flask backend
 function fetchBreathingData() {
-    fetch('/get-breathing-data')
+    fetch('https://draw2relax-backend.onrender.com/get-breathing-data')
         .then(res => res.json())
         .then(data => {
             const breathingValue = data.breathing_value;
@@ -513,7 +513,7 @@ function clearCanvas() {
     document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'inline-block';
     document.getElementById("toggle-mode-btn").style.display = "inline-block";
 
-    fetch('/clear-frames', {
+    fetch('https://draw2relax-backend.onrender.com/clear-frames', {
         method: 'POST'
     })
     .then(res => {
@@ -529,7 +529,7 @@ function clearCanvas() {
     frameImages = []
 
     if (breathingSensorActive){
-        fetch('/stop-sensor', {
+        fetch('https://draw2relax-backend.onrender.com/stop-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -559,7 +559,7 @@ function undo() {
     
 
     if (submitted) {
-        fetch('/clear-frames', {
+        fetch('https://draw2relax-backend.onrender.com/clear-frames', {
             method: 'POST'
         })
         .then(res => {
@@ -611,7 +611,7 @@ function submitDrawing() {
     isDrawingDisabled = true
     document.getElementById('spinner').style.display = 'block';
 
-    fetch('/process', {
+    fetch('https://draw2relax-backend.onrender.com/process', {
         method: 'POST',
         body: JSON.stringify({ image: dataURL }),
         headers: { 'Content-Type': 'application/json' }
@@ -633,7 +633,7 @@ function submitDrawing() {
         undoBtn.disabled = false;
         simulateBtn.disabled = false
 
-        fetch('/run-sensor', {
+        fetch('https://draw2relax-backend.onrender.com/run-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -681,7 +681,7 @@ function simulateBreathing() {
     isDrawingDisabled = true;
     document.getElementById('spinner').style.display = 'block';
 
-    fetch('/process', {
+    fetch('https://draw2relax-backend.onrender.com/process', {
         method: 'POST',
         body: JSON.stringify({ image: dataURL }),
         headers: { 'Content-Type': 'application/json' }
