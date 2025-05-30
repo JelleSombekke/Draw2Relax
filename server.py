@@ -19,7 +19,7 @@ from functions import make_circ_animation_frames
 model = YOLO("trained_model/weights/best.pt")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://jellesombekke.github.io"}})
+CORS(app, resources={r"/*": {"origins": "https://jellesombekke.github.io"}}, supports_credentials=True)
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
@@ -33,8 +33,10 @@ class IgnoreGetBreathingDataFilter(logging.Filter):
 log = logging.getLogger('werkzeug')
 log.addFilter(IgnoreGetBreathingDataFilter())
 
-@app.route('/process', methods=['POST'])
+@app.route('/process', methods=['POST', 'OPTIONS'])
 def process_image():
+    if request.method == 'OPTIONS':
+        return '', 204
     try:
         # Extract image data
         data = request.get_json()
