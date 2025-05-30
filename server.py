@@ -19,7 +19,7 @@ from functions import make_circ_animation_frames
 model = YOLO("trained_model/weights/best.pt")
 
 app = Flask(__name__)
-CORS(app, origins=["https://jellesombekke.github.io"])
+CORS(app, resources={r"/*": {"origins": "https://jellesombekke.github.io"}})
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
