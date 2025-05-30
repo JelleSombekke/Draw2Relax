@@ -63,8 +63,10 @@ def process_image():
         print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/clear-frames', methods=['POST'])
+@app.route('/clear-frames', methods=['POST', 'OPTIONS'])
 def clear_frames():
+    if request.method == 'OPTIONS':
+        return '', 204
     folder = os.path.join('static', 'guidance_flow_img')
     try:
         os.makedirs(folder, exist_ok=True)  # ensure it exists
@@ -76,8 +78,10 @@ def clear_frames():
         print(f"Failed to clear frames: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/run-sensor', methods=['POST'])
+@app.route('/run-sensor', methods=['POST', 'OPTIONS'])
 def start_breathing_sensor():
+    if request.method == 'OPTIONS':
+        return '', 204
     # Start the breathing sensor in a separate thread
     try:
         receive_breathing_sensor_data.start_sensor_thread()
@@ -96,8 +100,10 @@ def get_breathing_data():
 
     return jsonify({"breathing_value": value})
 
-@app.route('/stop-sensor', methods=['POST'])
+@app.route('/stop-sensor', methods=['POST', 'OPTIONS'])
 def stop_breathing_sensor():
+    if request.method == 'OPTIONS':
+        return '', 204
     # Stop the sensor thread
     receive_breathing_sensor_data.stop_sensor()
     return jsonify({"status": "Sensor stopped"}), 200
