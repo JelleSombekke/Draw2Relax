@@ -16,6 +16,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from functions import make_circ_animation_frames
+model = YOLO("../trained_model/weights/best.pt")
 
 app = Flask(__name__)
 CORS(app, origins="*")
@@ -63,8 +64,8 @@ def process_image():
 @app.route('/clear-frames', methods=['POST'])
 def clear_frames():
     folder = os.path.join('static', 'guidance_flow_img')
-    os.makedirs(folder, exist_ok=True)
     try:
+        os.makedirs(folder, exist_ok=True)  # ensure it exists
         for file in os.listdir(folder):
             if file.endswith('.png'):
                 os.remove(os.path.join(folder, file))
@@ -105,8 +106,6 @@ def run_pipeline(img, timestamp):
     n_iterations = 100
     growth_constant = 15000
 
-    # Load the model once (outside of your draw loop)
-    model = YOLO("../trained_model/weights/best.pt")
     results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, name="", exist_ok=True)
     padding = 5
     circular_structures = []
