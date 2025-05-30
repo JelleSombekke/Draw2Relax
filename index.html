@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Draw2Relax</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        #draw {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #toolbar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0);
+            padding: 8px;
+            border-radius: 8px;
+        }
+        button {
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .button-styled {
+            align-items: center;
+            appearance: none;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 24px;
+            border-style: none;
+            box-shadow: rgba(0, 0, 0, .2) 0 3px 5px -1px,
+                        rgba(0, 0, 0, .14) 0 6px 10px 0,
+                        rgba(0, 0, 0, .12) 0 1px 18px 0;
+            box-sizing: border-box;
+            color: #3c4043;
+            cursor: pointer;
+            display: inline-flex;
+            fill: currentcolor;
+            font-family: "Google Sans", Roboto, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            height: 48px;
+            justify-content: center;
+            letter-spacing: .25px;
+            line-height: normal;
+            max-width: 100%;
+            overflow: visible;
+            padding: 2px 24px;
+            position: relative;
+            text-align: center;
+            text-transform: none;
+            transition: box-shadow 280ms cubic-bezier(.4, 0, .2, 1),
+                        opacity 15ms linear 30ms,
+                        transform 270ms cubic-bezier(0, 0, .2, 1) 0ms;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            width: auto;
+            will-change: transform, opacity;
+            z-index: 0;
+        }
+
+        .button-styled:hover {
+        background: #F6F9FE;
+        color: #174ea6;
+        }
+
+        .button-styled:active {
+        box-shadow: 0 4px 4px 0 rgb(60 64 67 / 30%), 0 8px 12px 6px rgb(60 64 67 / 15%);
+        outline: none;
+        }
+
+        .button-styled:not(:disabled) {
+        box-shadow: rgba(60, 64, 67, .3) 0 1px 3px 0, rgba(60, 64, 67, .15) 0 4px 8px 3px;
+        }
+
+        .button-styled:not(:disabled):hover {
+        box-shadow: rgba(60, 64, 67, .3) 0 2px 3px 0, rgba(60, 64, 67, .15) 0 6px 10px 4px;
+        }
+
+        .button-styled:not(:disabled):focus {
+        box-shadow: rgba(60, 64, 67, .3) 0 1px 3px 0, rgba(60, 64, 67, .15) 0 4px 8px 3px;
+        }
+
+        .button-styled:not(:disabled):active {
+        box-shadow: rgba(60, 64, 67, .3) 0 4px 4px 0, rgba(60, 64, 67, .15) 0 8px 12px 6px;
+        }
+
+        .button-styled:disabled {
+        box-shadow: rgba(60, 64, 67, .3) 0 1px 3px 0, rgba(60, 64, 67, .15) 0 4px 8px 3px;
+        }
+
+        body.drawing-mode button,
+        body.drawing-mode .button-styled {
+            pointer-events: none;
+            cursor: default !important;
+            background: rgba(255, 255, 255, 0.75) !important;
+            color: #3c4043 !important;
+            box-shadow: rgba(0, 0, 0, .2) 0 1px 1px -1px,
+                        rgba(0, 0, 0, .14) 0 2px 4px 0,
+                        rgba(0, 0, 0, .12) 0 0px 12px 0 !important;
+        }
+
+        /* Loading spinner styles */
+        #spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 20;
+        }
+
+        .spinner-border {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+
+        #toggle-mode-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-family: sans-serif;
+            font-size: 14px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border: none;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        #sensor-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-family: sans-serif;
+            font-size: 14px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 20;
+        }
+
+        #status-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 8px;
+            background-color: red; /* Default: inactive */
+        }
+
+        #toggle-fullscreen-btn {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-family: sans-serif;
+            font-size: 14px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border: none;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        body.drawing-mode #toggle-mode-btn,
+        body.drawing-mode #sensor-status,
+        body.drawing-mode #toggle-fullscreen-btn {
+            pointer-events: none;
+            cursor: default !important;
+            background: rgba(255, 255, 255, 0.75) !important;
+            color: #3c4043 !important;
+            box-shadow: 0 0 6px rgba(0,0,0,0.1) !important;
+        }
+
+    </style>
+</head>
+<div id="spinner" style="
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 999;
+">
+    Processing...
+</div>
+<body>
+
+<canvas id="background"></canvas>
+<canvas id="draw"></canvas>
+
+<div id="toolbar">
+    <button class="button-styled" role="button" onclick="clearCanvas()">Clear</button>
+    <button class="button-styled" role="button" onclick="undo()">Undo</button>
+    <button class="button-styled" role="button" onclick="submitDrawing()">Submit</button>
+    <button class="button-styled" role="button" onclick="simulateBreathing()">Simulate</button>
+</div>
+
+<button id="toggle-mode-btn">Mousepad Mode: OFF</button>
+
+<button id="toggle-fullscreen-btn" onclick="toggleFullscreen();">Fullscreen Off</button>
+
+<div id="sensor-status">
+    <span id="status-text">Breathing Sensor Inactive</span>
+    <span id="status-light"></span>
+</div>
+
+<script>
+const canvas = document.getElementById('draw');
+const ctx = canvas.getContext('2d');
+const submitBtn = document.querySelector('button[onclick="submitDrawing()"]');
+const clearBtn = document.querySelector('button[onclick="clearCanvas()"]');
+const undoBtn = document.querySelector('button[onclick="undo()"]');
+const simulateBtn = document.querySelector('button[onclick="simulateBreathing()"]');
+
+let framePaths = []; 
+let drawing = false;
+let isDrawingDisabled = false;
+let mousepadMode = false;
+let currentPath = [];
+let submitted = false;
+let paths = [];
+let animationFrameId = null;
+let colorCounter = 0;
+let startColor = [255, 255, 255]
+let breathingSensorActive = false;
+let previousBreathingValue = 0;
+let currentBreathingValue = 0;
+let global_index = 0
+let isAnimating = false;
+let breathingIntervalId = null;
+let simulationIntervalId = null;
+let breathingDirection = "up"; // or "down"
+let previousValues = [];
+const maxWindowSize = 20;
+let peakDetected = false;
+let valleyDetected = false;
+let frameImages = [];
+
+const toggleModeBtn = document.getElementById('toggle-mode-btn');
+toggleModeBtn.addEventListener('click', () => {
+    mousepadMode = !mousepadMode;
+    toggleModeBtn.textContent = mousepadMode ? "Mousepad Mode: ON" : "Mousepad Mode: OFF";
+});
+
+window.addEventListener("beforeunload", (event) => {
+    // Send a background POST to clear frames
+    navigator.sendBeacon('/clear-frames');
+
+    // Optionally reset your local state
+    colorCounter = 0;
+    startColor = [255, 255, 255];
+    frameImages = []
+
+
+    if (breathingIntervalId !== null) {
+        clearInterval(breathingIntervalId);
+        breathingIntervalId = null;
+    }
+
+    if (simulationIntervalId !== null) {
+        clearInterval(simulationIntervalId);
+        simulationIntervalId = null;
+    }
+
+    if (breathingSensorActive){
+        fetch('/stop-sensor', {
+            method: 'POST',
+            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(response => {
+            breathingSensorActive = false;
+            updateSensorStatus();
+        })
+        .catch(err => {
+            console.error('Error during sensor deactivating:', err);
+            alert("Something went wrong. Please try again.");
+        })
+    }
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    if (isDrawingDisabled) return;
+    const point = { x: e.clientX, y: e.clientY };
+
+    if (mousepadMode) {
+        if (drawing) {
+            // Second click = stop drawing
+            drawing = false;
+            if (currentPath.length > 0) {
+                paths.push(currentPath);
+                currentPath = [];
+            }
+            submitBtn.disabled = false;
+            clearBtn.disabled = false;
+            undoBtn.disabled = false;
+            simulateBtn.disabled = false;
+            document.body.classList.remove('drawing-mode');
+        } else {
+            // First click = start drawing
+            drawing = true;
+            currentPath = [point];
+
+            submitBtn.disabled = true;
+            clearBtn.disabled = true;
+            undoBtn.disabled = true;
+            simulateBtn.disabled = true;
+            document.body.classList.add('drawing-mode');
+        }
+    } else {
+        drawing = true;
+        currentPath = [point];
+    }
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (isDrawingDisabled) return;
+    if (!mousepadMode && drawing) {
+        drawing = false;
+        submitBtn.disabled = false;
+        clearBtn.disabled = false;
+        undoBtn.disabled = false;
+        simulateBtn.disabled = false;
+        document.body.classList.remove('drawing-mode');
+        if (currentPath.length > 0) {
+            paths.push(currentPath);
+            currentPath = [];
+        }
+    }
+});
+
+
+window.addEventListener('mousemove', (e) => {
+    if (isDrawingDisabled) return;
+    if (!drawing) return;
+
+    submitBtn.disabled = true;
+    clearBtn.disabled = true;
+    undoBtn.disabled = true;
+    simulateBtn.disabled = true;
+    document.body.classList.add('drawing-mode');
+
+    const point = { x: e.clientX, y: e.clientY };
+    currentPath.push(point);
+
+    if (currentPath.length > 1) {
+        const prev = currentPath[currentPath.length - 2];
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  const button = document.getElementById('toggle-fullscreen-btn');
+  if (!document.fullscreenElement) {
+    button.textContent = 'Fullscreen Off';
+  } else {
+    button.textContent = 'Fullscreen On';
+  }
+});
+
+
+// Function to fetch sensor data from the Flask backend
+function fetchBreathingData() {
+    fetch('/get-breathing-data')
+        .then(res => res.json())
+        .then(data => {
+            const breathingValue = data.breathing_value;
+
+            // Keep original direction logic
+            const direction = (breathingValue > previousBreathingValue) ? "up"
+                             : (breathingValue < previousBreathingValue) ? "down"
+                             : breathingDirection;
+
+            breathingDirection = direction;
+            previousBreathingValue = breathingValue;
+
+            // Normalize and map to frame index
+            const minVal = 70;
+            const maxVal = 160;
+            const normalized = Math.max(0, Math.min(1, (breathingValue - minVal) / (maxVal - minVal)));
+            const index = Math.floor(normalized * (framePaths.length - 1));
+            console.log("Image index:", index);
+            showFrameAtIndex(index);
+
+            // Peak/trough detection
+            previousValues.push(breathingValue);
+            if (previousValues.length > maxWindowSize) previousValues.shift();
+
+            if (previousValues.length === maxWindowSize) {
+                const midIndex = Math.floor(maxWindowSize / 2);
+                const midValue = previousValues[midIndex];
+
+                const isPeak = previousValues.every((v, i) => i === midIndex || v < midValue);
+                const isValley = previousValues.every((v, i) => i === midIndex || v > midValue);
+
+                if (isPeak && !peakDetected) {
+                    peakDetected = true;
+                    valleyDetected = false;
+                    updateColorCycle(); // Inhale peak
+                } else if (isValley && !valleyDetected) {
+                    valleyDetected = true;
+                    peakDetected = false;
+                    updateColorCycle(); // Exhale bottom
+                }
+            }
+
+        })
+        .catch(err => console.error('Error fetching breathing data:', err));
+}
+
+
+function resizeCanvas() {
+    const displayWidth = window.innerWidth;
+    const displayHeight = window.innerHeight;
+    const resolutionScale = 2; // For high-DPI displays
+
+    const drawCanvas = document.getElementById('draw');
+    const bgCanvas = document.getElementById('background');
+
+    // Resize draw canvas
+    drawCanvas.width = displayWidth * resolutionScale;
+    drawCanvas.height = displayHeight * resolutionScale;
+    drawCanvas.style.width = displayWidth + 'px';
+    drawCanvas.style.height = displayHeight + 'px';
+
+    // Resize background canvas
+    bgCanvas.width = displayWidth;
+    bgCanvas.height = displayHeight;
+
+    // Reset and scale drawing context (assuming ctx is for drawCanvas)
+    const ctx = drawCanvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(resolutionScale, resolutionScale);
+
+    redrawAll(); // Your existing redraw logic
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    paths = [];
+    currentPath = [];
+
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animateBackgroundColor([255, 255, 255], [255, 255, 255], 1)
+    }
+
+    if (breathingIntervalId !== null) {
+        clearInterval(breathingIntervalId);
+        breathingIntervalId = null;
+    }
+    if (simulationIntervalId !== null) {
+        clearInterval(simulationIntervalId);
+        simulationIntervalId = null;
+    }
+
+    document.querySelector('button[onclick="submitDrawing()"]').style.display = 'inline-block';
+    document.querySelector('button[onclick="undo()"]').style.display = 'inline-block';
+    document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'inline-block';
+    document.getElementById("toggle-mode-btn").style.display = "inline-block";
+
+    fetch('/clear-frames', {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Failed to clear server frames');
+    })
+    .catch(err => {
+        console.error('Error clearing frames:', err);
+    });
+    submitted = false;
+    isDrawingDisabled = false;
+    colorCounter = 0;
+    startColor = [255, 255, 255]
+    frameImages = []
+
+    if (breathingSensorActive){
+        fetch('/stop-sensor', {
+            method: 'POST',
+            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(response => {
+            breathingSensorActive = false;
+            updateSensorStatus();
+        })
+        .catch(err => {
+            console.error('Error during sensor deactivating:', err);
+            alert("Something went wrong. Please try again.");
+    })
+    }
+}
+
+function undo() {
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animateBackgroundColor([255, 255, 255], [255, 255, 255], 1)
+    }
+    
+    if (paths.length > 0) {
+        paths.pop(); // Remove last stroke
+        redrawAll();
+    }
+    
+
+    if (submitted) {
+        fetch('/clear-frames', {
+            method: 'POST'
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to clear server frames');
+        })
+        .catch(err => {
+            console.error('Error clearing frames:', err);
+        });
+
+        submitted = false;
+        isDrawingDisabled = false;
+        colorCounter = 0;
+        startColor = [255, 255, 255]
+    }
+}
+
+function redrawAll() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'black';
+
+    for (let path of paths) {
+        for (let i = 1; i < path.length; i++) {
+            ctx.beginPath();
+            ctx.moveTo(path[i - 1].x, path[i - 1].y);
+            ctx.lineTo(path[i].x, path[i].y);
+            ctx.stroke();
+        }
+    }
+}
+
+function preloadFrames() {
+    frameImages = framePaths.map(base64 => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${base64}`;
+        return img;
+    });
+}
+
+function submitDrawing() {
+    const dataURL = canvas.toDataURL('image/png');
+    submitted = true;
+
+    submitBtn.disabled = true;
+    clearBtn.disabled = true;
+    undoBtn.disabled = true;
+    simulateBtn.disabled = true
+    isDrawingDisabled = true
+    document.getElementById('spinner').style.display = 'block';
+
+    fetch('/process', {
+        method: 'POST',
+        body: JSON.stringify({ image: dataURL }),
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(response => {
+        
+        framePaths = response.frames;
+        preloadFrames();
+        document.getElementById('spinner').style.display = 'none';
+        document.querySelector('button[onclick="submitDrawing()"]').style.display = 'none';
+        document.querySelector('button[onclick="undo()"]').style.display = 'none';
+        document.getElementById("toggle-mode-btn").style.display = "none";
+
+        showFrameAtIndex(0);
+        
+        submitBtn.disabled = false;
+        clearBtn.disabled = false;
+        undoBtn.disabled = false;
+        simulateBtn.disabled = false
+
+        fetch('/run-sensor', {
+            method: 'POST',
+            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(response => {
+            breathingSensorActive = true;
+            updateSensorStatus();
+            breathingIntervalId = setInterval(fetchBreathingData, 200);
+        })
+        .catch(err => {
+            console.error('Error during sensor activating:', err);
+            document.getElementById('spinner').style.display = 'none';
+            submitBtn.disabled = false;
+            clearBtn.disabled = false;
+            undoBtn.disabled = false;
+            simulateBtn.disabled = false
+    
+            isDrawingDisabled = false
+            alert("Something went wrong. Please try again.");
+        })
+    })
+    .catch(err => {
+        console.error('Error during image processing:', err);
+        document.getElementById('spinner').style.display = 'none';
+        submitBtn.disabled = false;
+        clearBtn.disabled = false;
+        undoBtn.disabled = false;
+        simulateBtn.disabled = false
+
+        isDrawingDisabled = false
+        alert("Something went wrong. Please try again.");
+    });
+}
+
+function simulateBreathing() {
+    const dataURL = canvas.toDataURL('image/png');
+    submitted = true;
+
+    submitBtn.disabled = true;
+    clearBtn.disabled = true;
+    undoBtn.disabled = true;
+    simulateBtn.disabled = true
+
+    isDrawingDisabled = true;
+    document.getElementById('spinner').style.display = 'block';
+
+    fetch('/process', {
+        method: 'POST',
+        body: JSON.stringify({ image: dataURL }),
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(response => {
+        framePaths = response.frames;
+        preloadFrames();
+        document.getElementById('spinner').style.display = 'none';
+        document.querySelector('button[onclick="submitDrawing()"]').style.display = 'none';
+        document.querySelector('button[onclick="undo()"]').style.display = 'none';
+        document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'none';
+        document.getElementById("toggle-mode-btn").style.display = "none";
+
+        showFrameAtIndex(0);
+
+        submitBtn.disabled = false;
+        clearBtn.disabled = false;
+        undoBtn.disabled = false;
+        simulateBtn.disabled = false
+
+        // --- Simulation Setup ---
+        const n_frames = framePaths.length;
+        const duration_sec = 100;
+        const sampling_rate = 200;
+        const total_samples = duration_sec * sampling_rate;
+
+        const breathing_rate_per_min = 30; // You can adjust this
+        const breath_cycles = (breathing_rate_per_min / 60) * duration_sec;
+
+        const minVal = 70;
+        const maxVal = 160;
+
+        const t_interp = Array.from({ length: total_samples }, (_, i) => i / sampling_rate);
+        const freq = breath_cycles / duration_sec; // cycles per second
+        const rr_interp = t_interp.map(t => Math.sin(2 * Math.PI * freq * t));
+
+        const min = Math.min(...rr_interp);
+        const max = Math.max(...rr_interp);
+        const rr_norm = rr_interp.map(v => (v - min) / (max - min)); // Normalize to [0, 1]
+
+        let i = 0;
+        const delay = 2000 / sampling_rate;
+
+        previousBreathingValue = 0;
+        previousValues = [];
+        peakDetected = false;
+        valleyDetected = false;
+
+        simulationIntervalId = setInterval(() => {
+            if (i >= rr_norm.length) {
+                clearInterval(simulationIntervalId);
+                simulationIntervalId = null;
+                console.log("Done with simulation");
+                return;
+            }
+
+            const normalized = rr_norm[i];
+            const breathingValue = normalized * (maxVal - minVal) + minVal;
+
+            const direction = (breathingValue > previousBreathingValue) ? "up"
+                             : (breathingValue < previousBreathingValue) ? "down"
+                             : breathingDirection;
+            breathingDirection = direction;
+            previousBreathingValue = breathingValue;
+
+            const index = Math.floor(normalized * (n_frames - 1));
+            showFrameAtIndex(index);
+
+            // Peak/trough detection
+            previousValues.push(breathingValue);
+            if (previousValues.length > maxWindowSize) previousValues.shift();
+
+            if (previousValues.length === maxWindowSize) {
+                const midIndex = Math.floor(maxWindowSize / 2);
+                const midValue = previousValues[midIndex];
+
+                const isPeak = previousValues.every((v, idx) => idx === midIndex || v < midValue);
+                const isValley = previousValues.every((v, idx) => idx === midIndex || v > midValue);
+
+                if (isPeak && !peakDetected) {
+                    peakDetected = true;
+                    valleyDetected = false;
+                    updateColorCycle(); // Simulated inhale peak
+                } else if (isValley && !valleyDetected) {
+                    valleyDetected = true;
+                    peakDetected = false;
+                    updateColorCycle(); // Simulated exhale valley
+                }
+            }
+
+            i++;
+        }, delay);
+    })
+    .catch(err => {
+        console.error('Error during image processing:', err);
+        document.getElementById('spinner').style.display = 'none';
+        submitBtn.disabled = false;
+        clearBtn.disabled = false;
+        undoBtn.disabled = false;
+        simulateBtn.disabled = false
+        isDrawingDisabled = false;
+        alert("Something went wrong. Please try again.");
+    });
+}
+
+
+function showFrameAtIndex(targetIndex) {
+    if (!frameImages.length || targetIndex < 0 || targetIndex >= frameImages.length) return;
+    if (isAnimating || targetIndex === global_index) return;
+
+    isAnimating = true;
+
+    const step = (targetIndex > global_index) ? 1 : -1;
+
+    function animateStep() {
+        global_index += step;
+
+        const img = frameImages[global_index];
+        if (!img.complete) {
+            // If image isn't loaded yet, wait and retry
+            setTimeout(animateStep, 5);
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width / 2, canvas.height / 2);
+
+        if (global_index !== targetIndex) {
+            setTimeout(animateStep, 10); // smooth step
+        } else {
+            isAnimating = false;
+        }
+    }
+
+    animateStep();
+}
+
+
+function getDoodleLength() {
+    let length = 0;
+    paths.forEach(path => {
+        for (let i = 1; i < path.length; i++) {
+            const dx = path[i].x - path[i - 1].x;
+            const dy = path[i].y - path[i - 1].y;
+            length += Math.sqrt(dx * dx + dy * dy);
+        }
+    });
+    return length;
+}
+
+function updateColorCycle(paletteName = 'blues') {
+    colorCounter++;
+
+    const palettes = {
+        blues: [
+            [180, 210, 255],
+            [100, 150, 255],
+            [130, 190, 255],
+            [160, 220, 255]
+        ],
+        reds: [
+            [255, 150, 150],
+            [255, 100, 100],
+            [200, 70, 70],
+            [230, 120, 120]
+        ],
+        purples: [
+            [200, 180, 255],
+            [160, 130, 255],
+            [220, 200, 255]
+        ]
+    };
+
+    const selectedPalette = palettes[paletteName] || palettes.blues;
+    const prevColor = startColor;
+    const nextColor = selectedPalette[colorCounter % selectedPalette.length];
+
+    // Blend slightly toward nextColor
+    const blendFactor = 0.15;
+    const newColor = [
+        Math.round(prevColor[0] * (1 - blendFactor) + nextColor[0] * blendFactor),
+        Math.round(prevColor[1] * (1 - blendFactor) + nextColor[1] * blendFactor),
+        Math.round(prevColor[2] * (1 - blendFactor) + nextColor[2] * blendFactor)
+    ];
+
+    console.log("Transitioning color from", prevColor, "to", newColor);
+    animateBackgroundColor(prevColor, newColor, 1500);
+    startColor = newColor;
+}
+
+function animateBackgroundColor(startColor, endColor, duration = 2000) {
+    const bgCanvas = document.getElementById('background');
+    const bgCtx = bgCanvas.getContext('2d');
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+
+    let startTime = null;
+    const [r1, g1, b1] = startColor;
+    const [r2, g2, b2] = endColor;
+
+    function drawLayeredStrokes(glowColor, layerCount = 4, radius = 100) {
+        if (!paths || paths.length === 0) return;
+
+        bgCtx.globalAlpha = 0.15;
+
+        for (let l = 0; l < layerCount; l++) {
+            const offsetX = Math.sin(l * 0.5) * 10;
+            const offsetY = Math.cos(l * 0.5) * 10;
+
+            paths.forEach(path => {
+                path.forEach(({ x, y }) => {
+                    const hueShift = Math.floor((x / bgCanvas.width) * 60);
+                    const r = Math.min(255, glowColor[0] + hueShift);
+                    const g = glowColor[1];
+                    const b = Math.max(0, glowColor[2] - hueShift);
+
+                    const gradient = bgCtx.createRadialGradient(
+                        x + offsetX, y + offsetY, 0,
+                        x + offsetX, y + offsetY, radius
+                    );
+                    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
+                    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+                    bgCtx.fillStyle = gradient;
+                    bgCtx.fillRect(x - radius + offsetX, y - radius + offsetY, radius * 2, radius * 2);
+                });
+            });
+        }
+
+        bgCtx.globalAlpha = 1.0;
+    }
+
+    function animate(time) {
+        if (!startTime) startTime = time;
+        const elapsed = time - startTime;
+        const t = Math.min(elapsed / duration, 1);
+
+        const r = Math.round(r1 + t * (r2 - r1));
+        const g = Math.round(g1 + t * (g2 - g1));
+        const b = Math.round(b1 + t * (b2 - b1));
+
+        // Fill base
+        bgCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+        // Add layered stroke glow
+        drawLayeredStrokes([r, g, b]);
+
+        if (t < 1) {
+            animationFrameId = requestAnimationFrame(animate);
+        }
+    }
+
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+    }
+
+    animationFrameId = requestAnimationFrame(animate);
+}
+
+
+function updateSensorStatus() {
+  const statusText = document.getElementById("status-text");
+  const statusLight = document.getElementById("status-light");
+
+  if (breathingSensorActive) {
+    statusText.textContent = "Breathing Sensor Active";
+    statusLight.style.backgroundColor = "green";
+  } else {
+    statusText.textContent = "Breathing Sensor Inactive";
+    statusLight.style.backgroundColor = "red";
+  }
+}
+
+function toggleFullscreen() {
+  const elem = document.documentElement;
+  const button = document.getElementById('toggle-fullscreen-btn');
+
+  if (!document.fullscreenElement &&
+      !document.webkitFullscreenElement &&
+      !document.msFullscreenElement) {
+    // ENTER fullscreen
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) {
+      elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) {
+      elem.msRequestFullscreen();
+    }
+    button.textContent = 'Fullscreen On';
+  } else {
+    // EXIT fullscreen
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+    button.textContent = 'Fullscreen Off';
+  }
+}
+
+
+</script>
+</body>
+</html>
