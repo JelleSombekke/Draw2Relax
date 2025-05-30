@@ -16,7 +16,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from functions import make_circ_animation_frames
-model = YOLO("../trained_model/weights/best.pt")
+model = YOLO("trained_model/weights/best.pt")
 
 app = Flask(__name__)
 CORS(app, origins=["https://jellesombekke.github.io"])
