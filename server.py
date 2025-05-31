@@ -1,5 +1,6 @@
 from flask import Flask, request, send_file, send_from_directory, jsonify
-from flask_cors import CORS
+import socket
+import qrcode
 import numpy as np
 import base64
 from io import BytesIO
@@ -19,7 +20,6 @@ from functions import make_circ_animation_frames
 model = YOLO("trained_model/weights/best.pt")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://jellesombekke.github.io"}}, supports_credentials=True)
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
@@ -32,6 +32,24 @@ class IgnoreGetBreathingDataFilter(logging.Filter):
 # Set up the custom log filter
 log = logging.getLogger('werkzeug')
 log.addFilter(IgnoreGetBreathingDataFilter())
+
+@app.route('/ip')
+def get_ip():
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    return jsonify({"ip": local_ip})
+
+@app.route('/qrcode')
+def generate_qr():
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    ws_url = f"http://{local_ip}:5000"  # your WebSocket URL or backend URL
+
+    img = qrcode.make(ws_url)
+    buf = BytesIO()
+    img.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
 
 @app.route('/process', methods=['POST', 'OPTIONS'])
 def process_image():
@@ -144,5 +162,5 @@ def run_pipeline(img, timestamp):
     return base64_frames, file_path_list
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True, threaded=True)
+    host_ip = socket.gethostbyname(socket.gethostname())
+    app.run(host=host_ip, port=5000, debug=True, threaded=True)

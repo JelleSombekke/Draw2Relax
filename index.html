@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <meta charset="UTF-8">
     <title>Draw2Relax</title>
     <style>
@@ -237,7 +238,9 @@
     <button class="button-styled" role="button" onclick="undo()">Undo</button>
     <button class="button-styled" role="button" onclick="submitDrawing()">Submit</button>
     <button class="button-styled" role="button" onclick="simulateBreathing()">Simulate</button>
+    <button id="show-qr-btn" class="button-styled">Connect iPad</button>
 </div>
+
 
 <button id="toggle-mode-btn">Mousepad Mode: OFF</button>
 
@@ -248,7 +251,19 @@
     <span id="status-light"></span>
 </div>
 
+<div id="qr-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 20px; border-radius: 12px; text-align: center;">
+        <h3>Scan this QR with your iPad</h3>
+        <img id="qr-image" src="" alt="QR Code" style="max-width: 300px; margin: 10px auto;">
+        <br>
+        <button onclick="closeQRModal()" style="margin-top: 10px;">Close</button>
+    </div>
+</div>
+
 <script>
+const socket = io('http://192.168.1.16:5000');
+
 const canvas = document.getElementById('draw');
 const ctx = canvas.getContext('2d');
 const submitBtn = document.querySelector('button[onclick="submitDrawing()"]');
@@ -307,7 +322,7 @@ window.addEventListener("beforeunload", (event) => {
     }
 
     if (breathingSensorActive){
-        fetch('https://draw2relax-backend.onrender.com/stop-sensor', {
+        fetch('/stop-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -341,6 +356,27 @@ document.addEventListener('fullscreenchange', () => {
     button.textContent = 'Fullscreen On';
   }
 });
+
+// Show button only on laptop
+window.addEventListener('DOMContentLoaded', () => {
+    if (!isIOS()) {
+        const qrBtn = document.getElementById('show-qr-btn');
+        qrBtn.style.display = 'block';
+        qrBtn.addEventListener('click', showQRModal);
+    }
+});
+
+function isIOS() {
+    const ua = navigator.userAgent;
+    return !/iPhone|iPad|Android|Mobile/i.test(ua);
+}
+
+function sendDrawingToLaptop() {
+    const dataURL = canvas.toDataURL('image/png');
+    socket.emit('send_drawing', { image: dataURL });
+    console.log("Drawing sent to laptop");
+}
+
 
 function getPointFromEvent(e) {
     if (e.touches) {
@@ -431,7 +467,7 @@ function drawMove(e) {
 
 // Function to fetch sensor data from the Flask backend
 function fetchBreathingData() {
-    fetch('https://draw2relax-backend.onrender.com/get-breathing-data')
+    fetch('/get-breathing-data')
         .then(res => res.json())
         .then(data => {
             const breathingValue = data.breathing_value;
@@ -532,15 +568,17 @@ function clearCanvas() {
     document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'inline-block';
     document.getElementById("toggle-mode-btn").style.display = "inline-block";
 
-    fetch('https://draw2relax-backend.onrender.com/clear-frames', {
-        method: 'POST'
-    })
-    .then(res => {
-        if (!res.ok) throw new Error('Failed to clear server frames');
-    })
-    .catch(err => {
-        console.error('Error clearing frames:', err);
-    });
+    if (!isIOS()) {
+        fetch('/clear-frames', {
+            method: 'POST'
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to clear server frames');
+        })
+        .catch(err => {
+            console.error('Error clearing frames:', err);
+        });
+    }
     submitted = false;
     isDrawingDisabled = false;
     colorCounter = 0;
@@ -548,7 +586,7 @@ function clearCanvas() {
     frameImages = []
 
     if (breathingSensorActive){
-        fetch('https://draw2relax-backend.onrender.com/stop-sensor', {
+        fetch('/stop-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -578,7 +616,7 @@ function undo() {
     
 
     if (submitted) {
-        fetch('https://draw2relax-backend.onrender.com/clear-frames', {
+        fetch('/clear-frames', {
             method: 'POST'
         })
         .then(res => {
@@ -620,6 +658,11 @@ function preloadFrames() {
 }
 
 function submitDrawing() {
+    if (isIOS()) {
+        sendDrawingToLaptop(); // Don't process locally on iPad
+        alert("Drawing sent to laptop for processing.");
+        return;
+    }
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
 
@@ -630,7 +673,7 @@ function submitDrawing() {
     isDrawingDisabled = true
     document.getElementById('spinner').style.display = 'block';
 
-    fetch('https://draw2relax-backend.onrender.com/process', {
+    fetch('/process', {
         method: 'POST',
         body: JSON.stringify({ image: dataURL }),
         headers: { 'Content-Type': 'application/json' }
@@ -652,7 +695,7 @@ function submitDrawing() {
         undoBtn.disabled = false;
         simulateBtn.disabled = false
 
-        fetch('https://draw2relax-backend.onrender.com/run-sensor', {
+        fetch('/run-sensor', {
             method: 'POST',
             body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json' }
@@ -688,6 +731,13 @@ function submitDrawing() {
     });
 }
 
+socket.on('drawing_data', data => {
+    const img = new Image();
+    img.src = data.image;
+    document.body.appendChild(img); // Or replace canvas logic
+    console.log("Received drawing from iPad");
+});
+
 function simulateBreathing() {
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
@@ -700,7 +750,7 @@ function simulateBreathing() {
     isDrawingDisabled = true;
     document.getElementById('spinner').style.display = 'block';
 
-    fetch('https://draw2relax-backend.onrender.com/process', {
+    fetch('/process', {
         method: 'POST',
         body: JSON.stringify({ image: dataURL }),
         headers: { 'Content-Type': 'application/json' }
@@ -1005,6 +1055,22 @@ function toggleFullscreen() {
   }
 }
 
+function showQRModal() {
+    fetch('/qrcode')
+        .then(res => res.blob())
+        .then(blob => {
+            const qrURL = URL.createObjectURL(blob);
+            document.getElementById('qr-image').src = qrURL;
+            document.getElementById('qr-modal').style.display = 'flex';
+        })
+        .catch(err => {
+            alert("Failed to load QR code: " + err.message);
+        });
+}
+
+function closeQRModal() {
+    document.getElementById('qr-modal').style.display = 'none';
+}
 
 </script>
 </body>
