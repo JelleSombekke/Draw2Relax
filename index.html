@@ -323,14 +323,40 @@ window.addEventListener("beforeunload", (event) => {
         })
     }
 });
+// Mouse
+canvas.addEventListener('mousedown', startDrawing);
+window.addEventListener('mousemove', drawMove);
+window.addEventListener('mouseup', stopDrawing);
 
-canvas.addEventListener('mousedown', (e) => {
+// Touch
+canvas.addEventListener('touchstart', startDrawing, { passive: false });
+canvas.addEventListener('touchmove', drawMove, { passive: false });
+canvas.addEventListener('touchend', stopDrawing);
+
+document.addEventListener('fullscreenchange', () => {
+  const button = document.getElementById('toggle-fullscreen-btn');
+  if (!document.fullscreenElement) {
+    button.textContent = 'Fullscreen Off';
+  } else {
+    button.textContent = 'Fullscreen On';
+  }
+});
+
+function getPointFromEvent(e) {
+    if (e.touches) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else {
+        return { x: e.clientX, y: e.clientY };
+    }
+}
+
+// ---- START DRAWING ----
+function startDrawing(e) {
     if (isDrawingDisabled) return;
-    const point = { x: e.clientX, y: e.clientY };
+    const point = getPointFromEvent(e);
 
     if (mousepadMode) {
         if (drawing) {
-            // Second click = stop drawing
             drawing = false;
             if (currentPath.length > 0) {
                 paths.push(currentPath);
@@ -342,10 +368,8 @@ canvas.addEventListener('mousedown', (e) => {
             simulateBtn.disabled = false;
             document.body.classList.remove('drawing-mode');
         } else {
-            // First click = start drawing
             drawing = true;
             currentPath = [point];
-
             submitBtn.disabled = true;
             clearBtn.disabled = true;
             undoBtn.disabled = true;
@@ -355,10 +379,14 @@ canvas.addEventListener('mousedown', (e) => {
     } else {
         drawing = true;
         currentPath = [point];
+        document.body.classList.add('drawing-mode');
     }
-});
 
-window.addEventListener('mouseup', (e) => {
+    e.preventDefault();
+}
+
+// ---- STOP DRAWING ----
+function stopDrawing(e) {
     if (isDrawingDisabled) return;
     if (!mousepadMode && drawing) {
         drawing = false;
@@ -372,21 +400,19 @@ window.addEventListener('mouseup', (e) => {
             currentPath = [];
         }
     }
-});
+    e.preventDefault();
+}
 
-
-window.addEventListener('mousemove', (e) => {
-    if (isDrawingDisabled) return;
-    if (!drawing) return;
+// ---- DRAW MOVE ----
+function drawMove(e) {
+    if (isDrawingDisabled || !drawing) return;
+    const point = getPointFromEvent(e);
+    currentPath.push(point);
 
     submitBtn.disabled = true;
     clearBtn.disabled = true;
     undoBtn.disabled = true;
     simulateBtn.disabled = true;
-    document.body.classList.add('drawing-mode');
-
-    const point = { x: e.clientX, y: e.clientY };
-    currentPath.push(point);
 
     if (currentPath.length > 1) {
         const prev = currentPath[currentPath.length - 2];
@@ -398,16 +424,9 @@ window.addEventListener('mousemove', (e) => {
         ctx.lineTo(point.x, point.y);
         ctx.stroke();
     }
-});
 
-document.addEventListener('fullscreenchange', () => {
-  const button = document.getElementById('toggle-fullscreen-btn');
-  if (!document.fullscreenElement) {
-    button.textContent = 'Fullscreen Off';
-  } else {
-    button.textContent = 'Fullscreen On';
-  }
-});
+    e.preventDefault();
+}
 
 
 // Function to fetch sensor data from the Flask backend
