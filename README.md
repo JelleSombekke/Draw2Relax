@@ -23,9 +23,9 @@ The WebUI contains the following buttons:
 - Submit: Submits the drawing for processing and starts running pipeline with breathing sensor (when submitting on non laptop device the drawing is sent to the laptop it is connected to).
 - Simulate: Submits the drawing for processing and simulates a breathing wave. (Button only exists on laptops)
 - Connect device: Pops up a QR-code so devices could connect to the laptops IP and submit drawings from the device towards the laptop. (Button only exists on laptops)
-- Palette: Blues: Selects the color palette for the pipeline (default Blues). (Button only exists on laptops)
-- Mousepad Mode: OFF: Changes drawing logic to click to start and stop drawing (default OFF). (Button only exists on laptops)
-- Fullscreen: OFF: Toggles fullscreen (default OFF).
+- Palette: Blues: Selects the color palette for the pipeline (default: Blues). (Button only exists on laptops)
+- Mousepad Mode: OFF: Changes drawing logic to click to start and stop drawing (default: OFF). (Button only exists on laptops)
+- Fullscreen: OFF: Toggles fullscreen (default: OFF).
 
 <img width="1512" alt="webUI" src="https://github.com/user-attachments/assets/633f5229-f878-4846-8780-c0a6fb86b222" />
 
