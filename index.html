@@ -462,6 +462,8 @@ const spinnerBlock = document.getElementById('spinner')
 const simulateBtn = document.querySelector('button[onclick="simulateBreathing()"]');
 const toggleBtn = document.getElementById("toggle-mode-btn")
 const connectBtn = document.getElementById('show-qr-btn');
+const sensorStatus = document.getElementById('sensor-status');
+const qrBtn = document.getElementById('show-qr-btn');
 
 let framePaths = []; 
 let drawing = false;
@@ -499,7 +501,6 @@ toggleModeBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-  const qrBtn = document.getElementById('show-qr-btn');
   if (isLaptop()) {
     qrBtn.addEventListener('click', showQRModal);
     toggleBtn.style.display = 'inline-block';
@@ -511,6 +512,7 @@ window.addEventListener('DOMContentLoaded', () => {
     qrBtn.style.display = 'none';
     paletteToggleBtn.style.display = 'none';
     simulateBtn.style.display = 'none';
+    sensorStatus.style.display = 'none';
   }
 });
 
