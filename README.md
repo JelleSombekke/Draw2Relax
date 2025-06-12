@@ -12,7 +12,7 @@ Draw2Relax is an interactive WebUI application that integrates user-drawn sketch
 - functions.py:  Includes core pipeline functions such as contour calculation and manipulation, contour refilling, and computing displacement fields for circular structures.
 - receive_breathing_sensor_data.py: Handles the reception, smoothing, and storage of breathing sensor data.
 
-### Files: 
+### Files
 - requirements.txt: Lists all required packages to run both the front-end and back-end components of the WebUI.
 - trained_model: Contains a model trained to detect various circular structures (circle, swirl, blob, oval, and half-circle). The model is based on Ultralytics’ YOLOv8n-seg architecture.
 
