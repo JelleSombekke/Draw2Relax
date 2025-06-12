@@ -4,7 +4,6 @@
 
 Draw2Relax is an interactive WebUI application that integrates user-drawn sketches with real-time breathing sensor input. It uses machine learning to detect and process circular structures from drawings, enabling a unique, meditative experience that links creativity and relaxation.
 
-## Getting Started
 
 ### Document Descriptions
 ### Code
