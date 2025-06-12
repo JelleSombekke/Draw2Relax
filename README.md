@@ -17,7 +17,7 @@ Draw2Relax is an interactive WebUI application that integrates user-drawn sketch
 - trained_model: Contains a model trained to detect various circular structures (circle, swirl, blob, oval, and half-circle). The model is based on Ultralytics’ YOLOv8n-seg architecture.
 
 ### WebUI
-The WebUI contains the following buttons:
+The WebUI contains the following buttons/:
 - Clear: Removes all drawn strokes.
 - Undo: Removes the last drawn stroke.
 - Submit: Submits the drawing for processing and starts running pipeline with breathing sensor (when submitting on non laptop device the drawing is sent to the laptop it is connected to).
@@ -26,6 +26,7 @@ The WebUI contains the following buttons:
 - Palette: Blues: Selects the color palette for the pipeline (default: Blues). (Button only exists on laptops)
 - Mousepad Mode: OFF: Changes drawing logic to click to start and stop drawing (default: OFF). (Button only exists on laptops)
 - Fullscreen: OFF: Toggles fullscreen (default: OFF).
+- Breathing Sensor Inactive: This displays if the breathing sensor is active or not (default: Inactive). (Unclickable, Button only exists on laptops)
 
 <img width="1512" alt="webUI" src="https://github.com/user-attachments/assets/633f5229-f878-4846-8780-c0a6fb86b222" />
 
