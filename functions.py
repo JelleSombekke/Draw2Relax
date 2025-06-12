@@ -5,6 +5,7 @@ import os, shutil
 from PIL import Image
 from io import BytesIO
 import base64
+import json
 
 def encode_image_to_base64(img_array):
     pil_img = Image.fromarray(img_array, mode='RGBA')
@@ -251,9 +252,8 @@ def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constan
 
     # Iterate over different descriptor counts
     for i, desc in enumerate(descriptor_values):
-        print(f"Frame number: {i}")
-        img_warped, _, _ = compute_displacement_fields(img, circles_structures, scale[i], falloff=2.5)
 
+        img_warped, _, _ = compute_displacement_fields(img, circles_structures, scale[i], falloff=2.5)
         reconstructed_contours = calculate_contours(img_warped, desc, growth_constant, mode=None)
 
         # Draw contours
@@ -273,4 +273,3 @@ def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constan
             base64_frames.append(base64_img)
 
     return base64_frames, [os.path.join(folder, f"{i:003}.png") for i in range(n_iterations)]
-

@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <meta charset="UTF-8">
     <title>Draw2Relax</title>
     <style>
@@ -212,8 +211,117 @@
             box-shadow: 0 0 6px rgba(0,0,0,0.1) !important;
         }
 
+        #qr-modal {
+            display: none; /* hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #qr-modal > div {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        #qr-modal img {
+            max-width: 300px;
+            margin: 10px auto;
+        }
+
+        #palette-dropdown {
+            display: block;
+            margin-top: 8px;
+            width: fit-content;
+            }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-options {
+            display: none;
+            position: absolute;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            padding: 8px 0;
+            z-index: 1000;
+            min-width: 160px;
+            top: 100%;
+            left: 0;
+            }
+
+        .dropdown-options.open {
+            display: block;
+        }
+
+        .palette-option {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .palette-option:hover {
+            background-color: #f0f0f0;
+        }
+
+        .palette-colors {
+            display: flex;
+            margin-left: auto;
+        }
+
+        .palette-swatch {
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+        }
+
+
     </style>
 </head>
+<body>
+
+<canvas id="background"></canvas>
+<canvas id="draw"></canvas>
+
+<div id="toolbar">
+    <button class="button-styled" role="button" onclick="clearCanvas()">Clear</button>
+    <button class="button-styled" role="button" onclick="undo()">Undo</button>
+    <button class="button-styled" role="button" onclick="submitDrawing()">Submit</button>
+    <button class="button-styled" role="button" onclick="simulateBreathing()">Simulate</button>
+    <button id="show-qr-btn" class="button-styled" style="display:none;">Connect device</button>
+
+    <div id="palette-dropdown" class="dropdown">
+        <button id="palette-toggle-btn" class="button-styled">Palette: <span id="selected-palette">Blues</span></button>
+        <div id="dropdown-options" class="dropdown-options"></div>
+    </div>
+
+</div>
+
+<button id="toggle-mode-btn">Mousepad Mode: OFF</button>
+
+<button id="toggle-fullscreen-btn" onclick="toggleFullscreen();">Fullscreen Off</button>
+
+<div id="sensor-status">
+    <span id="status-text">Breathing Sensor Inactive</span>
+    <span id="status-light"></span>
+</div>
+
 <div id="spinner" style="
     display: none;
     position: fixed;
@@ -228,48 +336,120 @@
 ">
     Processing...
 </div>
-<body>
 
-<canvas id="background"></canvas>
-<canvas id="draw"></canvas>
-
-<div id="toolbar">
-    <button class="button-styled" role="button" onclick="clearCanvas()">Clear</button>
-    <button class="button-styled" role="button" onclick="undo()">Undo</button>
-    <button class="button-styled" role="button" onclick="submitDrawing()">Submit</button>
-    <button class="button-styled" role="button" onclick="simulateBreathing()">Simulate</button>
-    <button id="show-qr-btn" class="button-styled">Connect iPad</button>
-</div>
-
-
-<button id="toggle-mode-btn">Mousepad Mode: OFF</button>
-
-<button id="toggle-fullscreen-btn" onclick="toggleFullscreen();">Fullscreen Off</button>
-
-<div id="sensor-status">
-    <span id="status-text">Breathing Sensor Inactive</span>
-    <span id="status-light"></span>
-</div>
-
-<div id="qr-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center;">
-    <div style="background: white; padding: 20px; border-radius: 12px; text-align: center;">
-        <h3>Scan this QR with your iPad</h3>
-        <img id="qr-image" src="" alt="QR Code" style="max-width: 300px; margin: 10px auto;">
-        <br>
-        <button onclick="closeQRModal()" style="margin-top: 10px;">Close</button>
+<!-- QR Modal -->
+<div id="qr-modal" style="display:none;">
+    <div>
+      <h3>Scan this QR with your device</h3>
+      <img id="qr-image" src="" alt="QR Code"/>
+      <br/>
+      <button onclick="closeQRModal()">Close</button>
     </div>
 </div>
 
 <script>
-const socket = io('http://192.168.1.16:5000');
+let laptopIP = null;
 
-const canvas = document.getElementById('draw');
-const ctx = canvas.getContext('2d');
+function setupCanvas(canvas, dpr) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Set canvas style size (CSS pixels)
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    // Set actual canvas size (scaled for resolution)
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Scale all drawings
+    return ctx;
+}
+
+const dpr = window.devicePixelRatio || 1;
+let canvas = document.getElementById('draw');
+let ctx = setupCanvas(canvas, dpr);
+let bgCanvas = document.getElementById('background');
+let bgCtx = setupCanvas(bgCanvas, dpr);
+let offscreenCanvas = document.createElement('canvas');
+let offscreenCtx = setupCanvas(offscreenCanvas, dpr);
+
+const paletteToggleBtn = document.getElementById("palette-toggle-btn");
+const dropdownOptions = document.getElementById("dropdown-options");
+const selectedText = document.getElementById("selected-palette");
+
+const palettes = {
+    blues: {
+        background: [[180, 210, 255], [100, 150, 255], [130, 190, 255], [160, 220, 255]],
+        glow:       [[100, 130, 255], [80, 120, 250], [60, 100, 220], [40, 80, 200]]
+    },
+    reds: {
+        background: [[255, 150, 150], [255, 100, 100], [200, 70, 70], [230, 120, 120]],
+        glow:       [[255, 100, 180], [200, 50, 130], [150, 30, 100], [220, 90, 150]]
+    },
+    purples: {
+        background: [[200, 180, 255], [160, 130, 255], [220, 200, 255]],
+        glow:       [[120, 100, 200], [90, 70, 180], [160, 140, 240]]
+    }
+};
+
+let chosenPalette = 'blues';
+let paletteDropdownOpen = false;
+
+// Populate dropdown options
+Object.entries(palettes).forEach(([name, colors]) => {
+  const option = document.createElement("div");
+  option.className = "palette-option";
+  option.dataset.palette = name;
+  option.innerHTML = `
+    ${name.charAt(0).toUpperCase() + name.slice(1)}
+    <div class="palette-colors">
+      ${colors.background.map(([r, g, b]) =>
+        `<div class="palette-swatch" style="background: rgb(${r},${g},${b})"></div>`
+      ).join('')}
+    </div>
+  `;
+
+  option.addEventListener("click", () => {
+    chosenPalette = name;
+    selectedText.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    closeDropdown();
+  });
+
+  dropdownOptions.appendChild(option);
+});
+
+// Toggle dropdown
+paletteToggleBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (paletteToggleBtn.disabled) return;
+
+  paletteDropdownOpen = !paletteDropdownOpen;
+  dropdownOptions.classList.toggle("open", paletteDropdownOpen);
+});
+
+// Close on outside click or touch
+document.addEventListener("click", () => closeDropdown());
+document.addEventListener("touchstart", (e) => {
+  if (paletteDropdownOpen && !dropdownOptions.contains(e.target) && e.target !== paletteToggleBtn) {
+    closeDropdown();
+  }
+});
+
+function closeDropdown() {
+  paletteDropdownOpen = false;
+  dropdownOptions.classList.remove("open");
+}
+
+
 const submitBtn = document.querySelector('button[onclick="submitDrawing()"]');
 const clearBtn = document.querySelector('button[onclick="clearCanvas()"]');
 const undoBtn = document.querySelector('button[onclick="undo()"]');
+const spinnerBlock = document.getElementById('spinner')
 const simulateBtn = document.querySelector('button[onclick="simulateBreathing()"]');
+const toggleBtn = document.getElementById("toggle-mode-btn")
+const connectBtn = document.getElementById('show-qr-btn');
 
 let framePaths = []; 
 let drawing = false;
@@ -279,13 +459,12 @@ let currentPath = [];
 let submitted = false;
 let paths = [];
 let animationFrameId = null;
-let colorCounter = 0;
-let startColor = [255, 255, 255]
 let breathingSensorActive = false;
 let previousBreathingValue = 0;
 let currentBreathingValue = 0;
 let global_index = 0
 let isAnimating = false;
+let isAnimatingBackground = false;
 let breathingIntervalId = null;
 let simulationIntervalId = null;
 let breathingDirection = "up"; // or "down"
@@ -294,11 +473,33 @@ const maxWindowSize = 20;
 let peakDetected = false;
 let valleyDetected = false;
 let frameImages = [];
+let colorCounter = 0;
+let startColor = [255, 255, 255];
+let prevColor = [255, 255, 255];
+let startGlowColor = [255, 255, 255];
+let prevGlowColor = [255, 255, 255];
+let blackPixels = null;
 
 const toggleModeBtn = document.getElementById('toggle-mode-btn');
 toggleModeBtn.addEventListener('click', () => {
     mousepadMode = !mousepadMode;
     toggleModeBtn.textContent = mousepadMode ? "Mousepad Mode: ON" : "Mousepad Mode: OFF";
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  const qrBtn = document.getElementById('show-qr-btn');
+  if (isLaptop()) {
+    qrBtn.addEventListener('click', showQRModal);
+    toggleBtn.style.display = 'inline-block';
+    qrBtn.style.display = 'inline-block';
+    paletteToggleBtn.style.display = 'inline-block';
+    simulateBtn.style.display = 'inline-block';
+  } else {
+    toggleBtn.style.display = 'none';
+    qrBtn.style.display = 'none';
+    paletteToggleBtn.style.display = 'none';
+    simulateBtn.style.display = 'none';
+  }
 });
 
 window.addEventListener("beforeunload", (event) => {
@@ -308,7 +509,11 @@ window.addEventListener("beforeunload", (event) => {
     // Optionally reset your local state
     colorCounter = 0;
     startColor = [255, 255, 255];
-    frameImages = []
+    prevColor = [255, 255, 255];
+    startGlowColor = [255, 255, 255];
+    prevGlowColor = [255, 255, 255];
+    blackPixels = null;
+    frameImages = [];
 
 
     if (breathingIntervalId !== null) {
@@ -357,26 +562,20 @@ document.addEventListener('fullscreenchange', () => {
   }
 });
 
-// Show button only on laptop
-window.addEventListener('DOMContentLoaded', () => {
-    if (!isIOS()) {
-        const qrBtn = document.getElementById('show-qr-btn');
-        qrBtn.style.display = 'block';
-        qrBtn.addEventListener('click', showQRModal);
-    }
-});
-
 function isIOS() {
-    const ua = navigator.userAgent;
-    return !/iPhone|iPad|Android|Mobile/i.test(ua);
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 }
 
-function sendDrawingToLaptop() {
-    const dataURL = canvas.toDataURL('image/png');
-    socket.emit('send_drawing', { image: dataURL });
-    console.log("Drawing sent to laptop");
+// Optional: You can also check for iPadOS 13+ (which reports as Mac but with touch)
+function isIPadOS() {
+  return (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+function isLaptop() {
+  // Laptop = Not iOS, not iPadOS, not any mobile device
+  return !isIOS() && !isIPadOS() && !/Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
 function getPointFromEvent(e) {
     if (e.touches) {
@@ -402,6 +601,8 @@ function startDrawing(e) {
             clearBtn.disabled = false;
             undoBtn.disabled = false;
             simulateBtn.disabled = false;
+            connectBtn.disabled = false;
+            paletteToggleBtn.disabled = false;
             document.body.classList.remove('drawing-mode');
         } else {
             drawing = true;
@@ -410,6 +611,8 @@ function startDrawing(e) {
             clearBtn.disabled = true;
             undoBtn.disabled = true;
             simulateBtn.disabled = true;
+            connectBtn.disabled = true;
+            paletteToggleBtn.disabled = true;
             document.body.classList.add('drawing-mode');
         }
     } else {
@@ -430,6 +633,8 @@ function stopDrawing(e) {
         clearBtn.disabled = false;
         undoBtn.disabled = false;
         simulateBtn.disabled = false;
+        connectBtn.disabled = false;
+        paletteToggleBtn.disabled = false;
         document.body.classList.remove('drawing-mode');
         if (currentPath.length > 0) {
             paths.push(currentPath);
@@ -449,6 +654,8 @@ function drawMove(e) {
     clearBtn.disabled = true;
     undoBtn.disabled = true;
     simulateBtn.disabled = true;
+    connectBtn.disabled = true;
+    paletteToggleBtn.disabled = true;
 
     if (currentPath.length > 1) {
         const prev = currentPath[currentPath.length - 2];
@@ -515,44 +722,18 @@ function fetchBreathingData() {
 }
 
 
-function resizeCanvas() {
-    const displayWidth = window.innerWidth;
-    const displayHeight = window.innerHeight;
-    const resolutionScale = 2; // For high-DPI displays
-
-    const drawCanvas = document.getElementById('draw');
-    const bgCanvas = document.getElementById('background');
-
-    // Resize draw canvas
-    drawCanvas.width = displayWidth * resolutionScale;
-    drawCanvas.height = displayHeight * resolutionScale;
-    drawCanvas.style.width = displayWidth + 'px';
-    drawCanvas.style.height = displayHeight + 'px';
-
-    // Resize background canvas
-    bgCanvas.width = displayWidth;
-    bgCanvas.height = displayHeight;
-
-    // Reset and scale drawing context (assuming ctx is for drawCanvas)
-    const ctx = drawCanvas.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(resolutionScale, resolutionScale);
-
-    redrawAll(); // Your existing redraw logic
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     paths = [];
     currentPath = [];
 
     if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
-        animateBackgroundColor([255, 255, 255], [255, 255, 255], 1)
+        animationFrameId = null;
     }
+
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
 
     if (breathingIntervalId !== null) {
         clearInterval(breathingIntervalId);
@@ -563,27 +744,34 @@ function clearCanvas() {
         simulationIntervalId = null;
     }
 
-    document.querySelector('button[onclick="submitDrawing()"]').style.display = 'inline-block';
-    document.querySelector('button[onclick="undo()"]').style.display = 'inline-block';
-    document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'inline-block';
-    document.getElementById("toggle-mode-btn").style.display = "inline-block";
-
-    if (!isIOS()) {
-        fetch('/clear-frames', {
-            method: 'POST'
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('Failed to clear server frames');
-        })
-        .catch(err => {
-            console.error('Error clearing frames:', err);
-        });
+    submitBtn.style.display = 'inline-block';
+    undoBtn.style.display = 'inline-block';
+    if (isLaptop()) {
+        toggleBtn.style.display = "inline-block";
+        simulateBtn.style.display = 'inline-block';
+        connectBtn.style.display = "inline-block";
+        paletteToggleBtn.style.display = "inline-block";
     }
+    fetch('/clear-frames', {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Failed to clear server frames');
+    })
+    .catch(err => {
+        console.error('Error clearing frames:', err);
+    });
+
     submitted = false;
     isDrawingDisabled = false;
+    isAnimatingBackground = false;
     colorCounter = 0;
-    startColor = [255, 255, 255]
-    frameImages = []
+    startColor = [255, 255, 255];
+    prevColor = [255, 255, 255];
+    startGlowColor = [255, 255, 255];
+    prevGlowColor = [255, 255, 255];
+    blackPixels = null;
+    frameImages = [];
 
     if (breathingSensorActive){
         fetch('/stop-sensor', {
@@ -629,7 +817,12 @@ function undo() {
         submitted = false;
         isDrawingDisabled = false;
         colorCounter = 0;
-        startColor = [255, 255, 255]
+        startColor = [255, 255, 255];
+        prevColor = [255, 255, 255];
+        startGlowColor = [255, 255, 255];
+        prevGlowColor = [255, 255, 255];
+        blackPixels = null;
+        frameImages = [];
     }
 }
 
@@ -649,20 +842,60 @@ function redrawAll() {
     }
 }
 
+
 function preloadFrames() {
-    frameImages = framePaths.map(base64 => {
-        const img = new Image();
-        img.src = `data:image/png;base64,${base64}`;
-        return img;
-    });
+    return Promise.all(frameImages = framePaths.map((base64, i) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = `data:image/png;base64,${base64}`;
+
+            img.onload = () => {
+                // Draw at natural image size to preserve pixel integrity
+                offscreenCanvas.width = img.width;
+                offscreenCanvas.height = img.height;
+                offscreenCtx.drawImage(img, 0, 0, img.width, img.height);
+
+                const imageData = offscreenCtx.getImageData(0, 0, img.width, img.height);
+                const minStep = 6;
+                const maxStep = 4;
+                const totalFrames = framePaths.length;
+
+                // Linearly interpolate step size
+                const sampleStep = Math.round(
+                    maxStep - ((maxStep - minStep) * (i / (totalFrames - 1)))
+                );
+
+                const blackPixels = [];
+
+                for (let y = 0; y < img.height; y += sampleStep) {
+                    for (let x = 0; x < img.width; x += sampleStep) {
+                        const idx = (y * img.width + x) * 4;
+                        const r = imageData.data[idx];
+                        const g = imageData.data[idx + 1];
+                        const b = imageData.data[idx + 2];
+                        const a = imageData.data[idx + 3];
+
+                        if (r < 50 && g < 50 && b < 50 && a > 50) {
+                            blackPixels.push({ x, y });
+                        }
+                    }
+                }
+
+                img.blackPixelsCache = blackPixels;
+                resolve(img);
+            };
+        });
+    }));
 }
 
+
 function submitDrawing() {
-    if (isIOS()) {
-        sendDrawingToLaptop(); // Don't process locally on iPad
+    if (!isLaptop()) {
+        sendDrawingToLaptop(); // Don't process locally on device
         alert("Drawing sent to laptop for processing.");
         return;
     }
+
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
 
@@ -670,8 +903,10 @@ function submitDrawing() {
     clearBtn.disabled = true;
     undoBtn.disabled = true;
     simulateBtn.disabled = true
+    connectBtn.disabled = true;
+    paletteToggleBtn.disabled = true;
     isDrawingDisabled = true
-    document.getElementById('spinner').style.display = 'block';
+    spinnerBlock.style.display = 'block';
 
     fetch('/process', {
         method: 'POST',
@@ -680,13 +915,22 @@ function submitDrawing() {
     })
     .then(res => res.json())
     .then(response => {
-        
+        framePaths = response.frames;
+        return preloadFrames();
+    })
+    .then(loadedImages => {
+        frameImages = loadedImages;
+
         framePaths = response.frames;
         preloadFrames();
-        document.getElementById('spinner').style.display = 'none';
-        document.querySelector('button[onclick="submitDrawing()"]').style.display = 'none';
-        document.querySelector('button[onclick="undo()"]').style.display = 'none';
-        document.getElementById("toggle-mode-btn").style.display = "none";
+
+        spinnerBlock.style.display = 'none';
+        submitBtn.style.display = 'none';
+        undoBtn.style.display = 'none';
+        toggleBtn.style.display = "none";
+        simulateBtn.style.display = "none";
+        connectBtn.style.display = "none";
+        paletteToggleBtn.disabled =  "none";
 
         showFrameAtIndex(0);
         
@@ -694,6 +938,8 @@ function submitDrawing() {
         clearBtn.disabled = false;
         undoBtn.disabled = false;
         simulateBtn.disabled = false
+        connectBtn.disabled = false;
+        paletteToggleBtn.disabled = false;
 
         fetch('/run-sensor', {
             method: 'POST',
@@ -708,11 +954,13 @@ function submitDrawing() {
         })
         .catch(err => {
             console.error('Error during sensor activating:', err);
-            document.getElementById('spinner').style.display = 'none';
+            spinnerBlock.style.display = 'none';
             submitBtn.disabled = false;
             clearBtn.disabled = false;
             undoBtn.disabled = false;
             simulateBtn.disabled = false
+            connectBtn.disabled = false;
+            paletteToggleBtn.disabled = false;
     
             isDrawingDisabled = false
             alert("Something went wrong. Please try again.");
@@ -720,23 +968,18 @@ function submitDrawing() {
     })
     .catch(err => {
         console.error('Error during image processing:', err);
-        document.getElementById('spinner').style.display = 'none';
+        spinnerBlock.style.display = 'none';
         submitBtn.disabled = false;
         clearBtn.disabled = false;
         undoBtn.disabled = false;
         simulateBtn.disabled = false
+        connectBtn.disabled = false;
+        paletteToggleBtn.disabled = false;
 
         isDrawingDisabled = false
         alert("Something went wrong. Please try again.");
     });
 }
-
-socket.on('drawing_data', data => {
-    const img = new Image();
-    img.src = data.image;
-    document.body.appendChild(img); // Or replace canvas logic
-    console.log("Received drawing from iPad");
-});
 
 function simulateBreathing() {
     const dataURL = canvas.toDataURL('image/png');
@@ -745,10 +988,12 @@ function simulateBreathing() {
     submitBtn.disabled = true;
     clearBtn.disabled = true;
     undoBtn.disabled = true;
-    simulateBtn.disabled = true
+    simulateBtn.disabled = true;
+    connectBtn.disabled = true;
+    paletteToggleBtn.disabled = true;
 
     isDrawingDisabled = true;
-    document.getElementById('spinner').style.display = 'block';
+    spinnerBlock.style.display = 'block';
 
     fetch('/process', {
         method: 'POST',
@@ -758,19 +1003,27 @@ function simulateBreathing() {
     .then(res => res.json())
     .then(response => {
         framePaths = response.frames;
-        preloadFrames();
-        document.getElementById('spinner').style.display = 'none';
-        document.querySelector('button[onclick="submitDrawing()"]').style.display = 'none';
-        document.querySelector('button[onclick="undo()"]').style.display = 'none';
-        document.querySelector('button[onclick="simulateBreathing()"]').style.display = 'none';
-        document.getElementById("toggle-mode-btn").style.display = "none";
+        return preloadFrames();
+    })
+    .then(loadedImages => {
+        frameImages = loadedImages;
+
+        spinnerBlock.style.display = 'none';
+        submitBtn.style.display = 'none';
+        undoBtn.style.display = 'none';
+        simulateBtn.style.display = 'none';
+        toggleBtn.style.display = "none";
+        connectBtn.style.display = "none";
+        paletteToggleBtn.style.display = "none";
 
         showFrameAtIndex(0);
 
         submitBtn.disabled = false;
         clearBtn.disabled = false;
         undoBtn.disabled = false;
-        simulateBtn.disabled = false
+        simulateBtn.disabled = false;
+        connectBtn.disabled = false;
+        paletteToggleBtn.disabled = false;
 
         // --- Simulation Setup ---
         const n_frames = framePaths.length;
@@ -828,17 +1081,17 @@ function simulateBreathing() {
                 const midIndex = Math.floor(maxWindowSize / 2);
                 const midValue = previousValues[midIndex];
 
-                const isPeak = previousValues.every((v, idx) => idx === midIndex || v < midValue);
-                const isValley = previousValues.every((v, idx) => idx === midIndex || v > midValue);
+                const isPeak = previousValues.every((v, i) => i === midIndex || v < midValue);
+                const isValley = previousValues.every((v, i) => i === midIndex || v > midValue);
 
                 if (isPeak && !peakDetected) {
                     peakDetected = true;
                     valleyDetected = false;
-                    updateColorCycle(); // Simulated inhale peak
+                    updateColorCycle(); // Inhale peak
                 } else if (isValley && !valleyDetected) {
                     valleyDetected = true;
                     peakDetected = false;
-                    updateColorCycle(); // Simulated exhale valley
+                    updateColorCycle(); // Exhale bottom
                 }
             }
 
@@ -847,11 +1100,14 @@ function simulateBreathing() {
     })
     .catch(err => {
         console.error('Error during image processing:', err);
-        document.getElementById('spinner').style.display = 'none';
+        spinnerBlock.style.display = 'none';
         submitBtn.disabled = false;
         clearBtn.disabled = false;
         undoBtn.disabled = false;
-        simulateBtn.disabled = false
+        simulateBtn.disabled = false;
+        connectBtn.disabled = false;
+        paletteToggleBtn.disabled = false;
+
         isDrawingDisabled = false;
         alert("Something went wrong. Please try again.");
     });
@@ -877,7 +1133,8 @@ function showFrameAtIndex(targetIndex) {
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width / 2, canvas.height / 2);
+        ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+        animateBackgroundColor(targetIndex, prevColor, startColor, 5000);
 
         if (global_index !== targetIndex) {
             setTimeout(animateStep, 10); // smooth step
@@ -888,7 +1145,6 @@ function showFrameAtIndex(targetIndex) {
 
     animateStep();
 }
-
 
 function getDoodleLength() {
     let length = 0;
@@ -902,157 +1158,290 @@ function getDoodleLength() {
     return length;
 }
 
-function updateColorCycle(paletteName = 'blues') {
-    colorCounter++;
+function updateColorCycle() {
+    const paletteObj = palettes[chosenPalette]
+    const bgPalette = paletteObj.background;
+    const glowPalette = paletteObj.glow;
 
-    const palettes = {
-        blues: [
-            [180, 210, 255],
-            [100, 150, 255],
-            [130, 190, 255],
-            [160, 220, 255]
-        ],
-        reds: [
-            [255, 150, 150],
-            [255, 100, 100],
-            [200, 70, 70],
-            [230, 120, 120]
-        ],
-        purples: [
-            [200, 180, 255],
-            [160, 130, 255],
-            [220, 200, 255]
-        ]
-    };
+    const blendFactor = 0.05;
 
-    const selectedPalette = palettes[paletteName] || palettes.blues;
-    const prevColor = startColor;
-    const nextColor = selectedPalette[colorCounter % selectedPalette.length];
-
-    // Blend slightly toward nextColor
-    const blendFactor = 0.15;
-    const newColor = [
-        Math.round(prevColor[0] * (1 - blendFactor) + nextColor[0] * blendFactor),
-        Math.round(prevColor[1] * (1 - blendFactor) + nextColor[1] * blendFactor),
-        Math.round(prevColor[2] * (1 - blendFactor) + nextColor[2] * blendFactor)
+    // Background color update
+    const nextColor = bgPalette[colorCounter % bgPalette.length];
+    prevColor = [...startColor];
+    startColor = [
+        Math.round(startColor[0] * (1 - blendFactor) + nextColor[0] * blendFactor),
+        Math.round(startColor[1] * (1 - blendFactor) + nextColor[1] * blendFactor),
+        Math.round(startColor[2] * (1 - blendFactor) + nextColor[2] * blendFactor)
     ];
 
-    console.log("Transitioning color from", prevColor, "to", newColor);
-    animateBackgroundColor(prevColor, newColor, 1500);
-    startColor = newColor;
+    // Glow color update (from separate palette)
+    const nextGlowColor = glowPalette[colorCounter % glowPalette.length];
+    prevGlowColor = [...startGlowColor];
+    startGlowColor = [
+        Math.round(startGlowColor[0] * (1 - blendFactor) + nextGlowColor[0] * blendFactor),
+        Math.round(startGlowColor[1] * (1 - blendFactor) + nextGlowColor[1] * blendFactor),
+        Math.round(startGlowColor[2] * (1 - blendFactor) + nextGlowColor[2] * blendFactor)
+    ];
+
+    colorCounter++;
 }
 
-function animateBackgroundColor(startColor, endColor, duration = 2000) {
-    const bgCanvas = document.getElementById('background');
-    const bgCtx = bgCanvas.getContext('2d');
-    bgCanvas.width = window.innerWidth;
-    bgCanvas.height = window.innerHeight;
+function createGlowStamp(color, radius) {
+    const size = radius * 2;
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = size;
+    const glowCtx = glowCanvas.getContext('2d');
 
+    const [r, g, b] = color;
+    const gradient = glowCtx.createRadialGradient(
+        radius, radius, 0,
+        radius, radius, radius
+    );
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+    glowCtx.fillStyle = gradient;
+    glowCtx.fillRect(0, 0, size, size);
+
+    return glowCanvas;
+}
+
+function animateBackgroundColor(targetIndex, startColor, endColor, duration = 5000) {
+    const doodleImg = frameImages[targetIndex];
+    if (!doodleImg || !doodleImg.complete || !doodleImg.blackPixelsCache) {
+        setTimeout(() => animateBackgroundColor(targetIndex, startColor, endColor, duration), 10);
+        return;
+    }
+
+    blackPixels = doodleImg.blackPixelsCache;
     let startTime = null;
-    const [r1, g1, b1] = startColor;
-    const [r2, g2, b2] = endColor;
+    isAnimatingBackground = true;
 
-    function drawLayeredStrokes(glowColor, layerCount = 4, radius = 100) {
-        if (!paths || paths.length === 0) return;
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
 
-        bgCtx.globalAlpha = 0.15;
+    function drawLayeredStrokes(color, layerCount = 2, radius = 15) {
+        bgCtx.save();
+        bgCtx.globalAlpha = 0.9;
+        radius = radius * (targetIndex / (framePaths.length - 1)) + 5
+
+        const adjustedRadius = radius * dpr;
+        const glowStamp = createGlowStamp(color, adjustedRadius);
 
         for (let l = 0; l < layerCount; l++) {
             const offsetX = Math.sin(l * 0.5) * 10;
             const offsetY = Math.cos(l * 0.5) * 10;
 
-            paths.forEach(path => {
-                path.forEach(({ x, y }) => {
-                    const hueShift = Math.floor((x / bgCanvas.width) * 60);
-                    const r = Math.min(255, glowColor[0] + hueShift);
-                    const g = glowColor[1];
-                    const b = Math.max(0, glowColor[2] - hueShift);
+            blackPixels.forEach(({ x, y }) => {
+                const sx = (x + offsetX) / dpr;
+                const sy = (y + offsetY) / dpr;
 
-                    const gradient = bgCtx.createRadialGradient(
-                        x + offsetX, y + offsetY, 0,
-                        x + offsetX, y + offsetY, radius
-                    );
-                    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
-                    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-
-                    bgCtx.fillStyle = gradient;
-                    bgCtx.fillRect(x - radius + offsetX, y - radius + offsetY, radius * 2, radius * 2);
-                });
+                bgCtx.drawImage(glowStamp, sx - adjustedRadius, sy - adjustedRadius);
             });
         }
-
-        bgCtx.globalAlpha = 1.0;
+        bgCtx.restore();
     }
 
+
     function animate(time) {
+        if (!isAnimatingBackground) return;
         if (!startTime) startTime = time;
+
         const elapsed = time - startTime;
         const t = Math.min(elapsed / duration, 1);
 
-        const r = Math.round(r1 + t * (r2 - r1));
-        const g = Math.round(g1 + t * (g2 - g1));
-        const b = Math.round(b1 + t * (b2 - b1));
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
 
-        // Fill base
-        bgCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        // Interpolate glow color ahead of background
+        const glowR = Math.round(prevGlowColor[0] + (startGlowColor[0] - prevGlowColor[0]) * t);
+        const glowG = Math.round(prevGlowColor[1] + (startGlowColor[1] - prevGlowColor[1]) * t);
+        const glowB = Math.round(prevGlowColor[2] + (startGlowColor[2] - prevGlowColor[2]) * t);
+        const glowColor = [glowR, glowG, glowB];
+
+        // Interpolate background color normally
+        const bgR = Math.round(startColor[0] + (endColor[0] - startColor[0]) * t);
+        const bgG = Math.round(startColor[1] + (endColor[1] - startColor[1]) * t);
+        const bgB = Math.round(startColor[2] + (endColor[2] - startColor[2]) * t);
+
+        // Fill background with interpolated color
+        bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
         bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 
-        // Add layered stroke glow
-        drawLayeredStrokes([r, g, b]);
+        drawLayeredStrokes(glowColor);
 
         if (t < 1) {
             animationFrameId = requestAnimationFrame(animate);
+        } else {
+            isAnimatingBackground = false;
         }
     }
-
-    if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-    }
-
     animationFrameId = requestAnimationFrame(animate);
 }
 
-
 function updateSensorStatus() {
-  const statusText = document.getElementById("status-text");
-  const statusLight = document.getElementById("status-light");
+    const statusText = document.getElementById("status-text");
+    const statusLight = document.getElementById("status-light");
 
-  if (breathingSensorActive) {
-    statusText.textContent = "Breathing Sensor Active";
-    statusLight.style.backgroundColor = "green";
-  } else {
-    statusText.textContent = "Breathing Sensor Inactive";
-    statusLight.style.backgroundColor = "red";
-  }
+    if (breathingSensorActive) {
+        statusText.textContent = "Breathing Sensor Active";
+        statusLight.style.backgroundColor = "green";
+    } else {
+        statusText.textContent = "Breathing Sensor Inactive";
+        statusLight.style.backgroundColor = "red";
+    }
 }
 
-function toggleFullscreen() {
-  const elem = document.documentElement;
-  const button = document.getElementById('toggle-fullscreen-btn');
 
-  if (!document.fullscreenElement &&
-      !document.webkitFullscreenElement &&
-      !document.msFullscreenElement) {
-    // ENTER fullscreen
-    if (elem.requestFullscreen) {
-      elem.requestFullscreen();
-    } else if (elem.webkitRequestFullscreen) {
-      elem.webkitRequestFullscreen();
-    } else if (elem.msRequestFullscreen) {
-      elem.msRequestFullscreen();
+function resizeAllCanvases() {
+    ctx = setupCanvas(canvas, dpr);
+    bgCtx = setupCanvas(bgCanvas, dpr);
+    redrawAll();
+    if (typeof reapplyBackground === 'function') {
+        reapplyBackground(bgCtx); // Optional: restore background visuals
     }
-    button.textContent = 'Fullscreen On';
-  } else {
-    // EXIT fullscreen
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    } else if (document.msExitFullscreen) {
-      document.msExitFullscreen();
+}
+window.addEventListener('resize', resizeAllCanvases);
+resizeAllCanvases();
+
+function toggleFullscreen() {
+    const elem = document.documentElement;
+    const button = document.getElementById('toggle-fullscreen-btn');
+    const isFullscreen = document.fullscreenElement ||
+                          document.webkitFullscreenElement ||
+                          document.msFullscreenElement;
+
+    const handleResize = () => setTimeout(resizeAllCanvases, 250);
+
+    if (!isFullscreen) {
+        // ENTER fullscreen
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+        button.textContent = 'Fullscreen On';
+    } else {
+        // EXIT fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        button.textContent = 'Fullscreen Off';
     }
-    button.textContent = 'Fullscreen Off';
-  }
+
+    handleResize();
+}
+
+
+function fetchLaptopIP() {
+    return fetch('/ip')
+        .then(res => res.json())
+        .then(data => {
+            laptopIP = data.ip;
+            console.log("Laptop IP fetched:", laptopIP);
+        })
+        .catch(err => {
+            console.error("Failed to get laptop IP:", err);
+        });
+}
+
+async function sendDrawingToLaptop() {
+    const dataURL = canvas.toDataURL('image/png');
+    await fetchLaptopIP(); // Wait for laptopIP to be set
+
+    fetch(`http://${laptopIP}:5000/upload`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+            image: dataURL,
+            width: canvas.width / window.devicePixelRatio,
+            height: canvas.height / window.devicePixelRatio
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(() => {
+        alert("Drawing sent successfully");
+        toggleFullscreen()
+        // Laptop will poll and detect the new drawing
+    })
+    .catch(err => {
+        console.error("Error sending drawing:", err);
+        alert("Failed to send to laptop.");
+    });
+}
+
+async function loadDrawing() {
+    try {
+        const metaRes = await fetch('/drawing-meta');
+        if (!metaRes.ok) throw new Error('No metadata yet');
+        const meta = await metaRes.json();
+        const { width: ipadWidth, height: ipadHeight } = meta;
+
+        const imgRes = await fetch('/draw');
+        if (!imgRes.ok) throw new Error('No drawing yet');
+        const blob = await imgRes.blob();
+
+        const img = new Image();
+        img.onload = () => {
+            // Get device pixel ratio
+            const dpr = window.devicePixelRatio || 1;
+
+            // Get canvas size from CSS (visible size)
+            const rect = canvas.getBoundingClientRect();
+
+            // Resize canvas to match display size at full resolution
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+
+            // Get 2D context and scale it for HiDPI
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+            ctx.scale(dpr, dpr);
+
+            // Clear canvas before drawing
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            // Compute scaled image size (use iPad metadata)
+            const imgWidth = ipadWidth;
+            const imgHeight = ipadHeight;
+
+            // Scale image to match visual pixels
+            const scaledWidth = imgWidth / dpr;
+            const scaledHeight = imgHeight / dpr;
+
+            // Center the image within the visible canvas
+            const x = (rect.width - scaledWidth) / 2;
+            const y = (rect.height - scaledHeight) / 2;
+
+            // Draw the image at proper scale and center
+            ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+        };
+
+        img.src = URL.createObjectURL(blob);
+    } catch (err) {
+        console.log("Waiting for drawing...", err);
+    }
+}
+
+function pollForNewDrawing() {
+  fetch('/new-drawing')
+    .then(res => res.json())
+    .then(data => {
+      if (data.new_drawing) {
+        console.log("New drawing detected! Loading...");
+        loadDrawing();
+      }
+    })
+    .catch(err => {
+      console.error("Error polling for new drawing:", err);
+    });
 }
 
 function showQRModal() {
@@ -1072,6 +1461,12 @@ function closeQRModal() {
     document.getElementById('qr-modal').style.display = 'none';
 }
 
+
+// Start polling every 3 seconds (only on laptop)
+if (isLaptop()) {
+  setInterval(pollForNewDrawing, 3000);
+}
 </script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </body>
 </html>

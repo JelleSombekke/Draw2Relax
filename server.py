@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, send_from_directory, jsonify
+from flask import Flask, request, send_file, send_from_directory, jsonify, Response
 import socket
 import qrcode
 import numpy as np
@@ -17,16 +17,25 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from functions import make_circ_animation_frames
-model = YOLO("trained_model/weights/best.pt")
+
+latest_image_data = None
+new_drawing_available = False
+drawing_meta = {"width": 0, "height": 0}
 
 app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
 
 # Define a custom log filter
 class IgnoreGetBreathingDataFilter(logging.Filter):
     def filter(self, record):
-        # Ignore logs that contain 'GET /get-breathing-data'
+        # Ignore certain logs
         if "GET /get-breathing-data" in record.getMessage():
-            return False  # Filter out these logs
+            return False
+        elif "GET /new-drawing" in record.getMessage():
+            return False
         return True
 
 # Set up the custom log filter
@@ -51,10 +60,43 @@ def generate_qr():
     buf.seek(0)
     return send_file(buf, mimetype='image/png')
 
-@app.route('/process', methods=['POST', 'OPTIONS'])
+@app.route('/upload', methods=['POST'])
+def upload():
+    global latest_image_data, drawing_meta, new_drawing_available
+    data = request.json
+    img_data = data['image'].split(",")[1]
+    img_bytes = base64.b64decode(img_data)
+    img = Image.open(BytesIO(img_bytes))
+    latest_image_data = img
+    drawing_meta['width'], drawing_meta['height'] = img.size
+    new_drawing_available = True
+    return jsonify({"status": "success"})
+
+@app.route('/draw')
+def get_draw():
+    global latest_image_data
+    if latest_image_data:
+        img_io = BytesIO()
+        latest_image_data.save(img_io, 'PNG')
+        img_io.seek(0)
+        return send_file(img_io, mimetype='image/png')
+    else:
+        return '', 404
+
+@app.route('/drawing-meta')
+def get_meta():
+    global drawing_meta
+    return jsonify(drawing_meta)
+
+@app.route('/new-drawing')
+def new_drawing():
+    global new_drawing_available
+    flag = new_drawing_available
+    new_drawing_available = False
+    return jsonify({"new_drawing": flag})
+
+@app.route('/process', methods=['POST'])
 def process_image():
-    if request.method == 'OPTIONS':
-        return '', 204
     try:
         # Extract image data
         data = request.get_json()
@@ -74,20 +116,18 @@ def process_image():
         gray_img.save(f'drawings/drawing_{timestamp}.png')
 
         # Run your processing pipeline
-        base64_frames, file_path_list= run_pipeline(img, timestamp)
+        base64_frames, file_path_list = run_pipeline(img, timestamp)
         return jsonify({"frames": base64_frames})
 
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/clear-frames', methods=['POST', 'OPTIONS'])
+@app.route('/clear-frames', methods=['POST'])
 def clear_frames():
-    if request.method == 'OPTIONS':
-        return '', 204
     folder = os.path.join('static', 'guidance_flow_img')
+    os.makedirs(folder, exist_ok=True)
     try:
-        os.makedirs(folder, exist_ok=True)  # ensure it exists
         for file in os.listdir(folder):
             if file.endswith('.png'):
                 os.remove(os.path.join(folder, file))
@@ -96,10 +136,8 @@ def clear_frames():
         print(f"Failed to clear frames: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/run-sensor', methods=['POST', 'OPTIONS'])
+@app.route('/run-sensor', methods=['POST'])
 def start_breathing_sensor():
-    if request.method == 'OPTIONS':
-        return '', 204
     # Start the breathing sensor in a separate thread
     try:
         receive_breathing_sensor_data.start_sensor_thread()
@@ -118,10 +156,8 @@ def get_breathing_data():
 
     return jsonify({"breathing_value": value})
 
-@app.route('/stop-sensor', methods=['POST', 'OPTIONS'])
+@app.route('/stop-sensor', methods=['POST'])
 def stop_breathing_sensor():
-    if request.method == 'OPTIONS':
-        return '', 204
     # Stop the sensor thread
     receive_breathing_sensor_data.stop_sensor()
     return jsonify({"status": "Sensor stopped"}), 200
@@ -132,9 +168,12 @@ def run_pipeline(img, timestamp):
     n_iterations = 100
     growth_constant = 15000
 
-    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, name="", exist_ok=True)
+    # Load the model once (outside of your draw loop)
+    model = YOLO("../circle_detection_model/runs/segment/train2/weights/best.pt")
+    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, project="../circle_detection_model/runs/segment", name="", exist_ok=True)
     padding = 5
     circular_structures = []
+
 
     for r in results:
 
@@ -163,4 +202,4 @@ def run_pipeline(img, timestamp):
 
 if __name__ == '__main__':
     host_ip = socket.gethostbyname(socket.gethostname())
-    app.run(host=host_ip, port=5000, debug=True, threaded=True)
+    app.run(host=host_ip, port=5000, debug=False, threaded=True)
