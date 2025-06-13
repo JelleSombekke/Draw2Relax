@@ -18,7 +18,7 @@ This application must be run locally, as GitHub Pages does not support the requi
 - trained_model: Contains a model trained to detect various circular structures (circle, swirl, blob, oval, and half-circle). The model is based on Ultralytics’ YOLOv8n-seg architecture.
 
 ### WebUI
-The WebUI contains the following buttons/:
+The WebUI contains the following buttons:
 - Clear: Removes all drawn strokes.
 - Undo: Removes the last drawn stroke.
 - Submit: Submits the drawing for processing and starts running pipeline with breathing sensor (when submitting on non laptop device the drawing is sent to the laptop it is connected to).
