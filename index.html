@@ -27,6 +27,7 @@
             z-index: 1;
         }
         #toolbar {
+            pointer-events: none;
             position: fixed;
             top: 10px;
             left: 10px;
@@ -36,6 +37,7 @@
             border-radius: 8px;
         }
         button {
+            pointer-events: auto;
             font-size: 16px;
             margin-right: 10px;
         }
@@ -240,6 +242,7 @@
         }
 
         #palette-dropdown {
+            pointer-events: auto;
             display: block;
             margin-top: 8px;
             width: fit-content;
@@ -464,6 +467,7 @@ const toggleBtn = document.getElementById("toggle-mode-btn")
 const connectBtn = document.getElementById('show-qr-btn');
 const sensorStatus = document.getElementById('sensor-status');
 const qrBtn = document.getElementById('show-qr-btn');
+const fulllscreenBtn = document.getElementById('toggle-fullscreen-btn');
 
 let framePaths = []; 
 let drawing = false;
@@ -568,11 +572,10 @@ canvas.addEventListener('touchmove', drawMove, { passive: false });
 canvas.addEventListener('touchend', stopDrawing);
 
 document.addEventListener('fullscreenchange', () => {
-  const button = document.getElementById('toggle-fullscreen-btn');
   if (!document.fullscreenElement) {
-    button.textContent = 'Fullscreen Off';
+    fulllscreenBtn.textContent = 'Fullscreen Off';
   } else {
-    button.textContent = 'Fullscreen On';
+    fulllscreenBtn.textContent = 'Fullscreen On';
   }
 });
 
@@ -760,6 +763,7 @@ function clearCanvas() {
 
     submitBtn.style.display = 'inline-block';
     undoBtn.style.display = 'inline-block';
+    fulllscreenBtn.style.display = "inline-block";
     if (isLaptop()) {
         toggleBtn.style.display = "inline-block";
         simulateBtn.style.display = 'inline-block';
@@ -945,6 +949,7 @@ function submitDrawing() {
         simulateBtn.style.display = "none";
         connectBtn.style.display = "none";
         paletteToggleBtn.disabled =  "none";
+        fulllscreenBtn.style.display = "none";
 
         showFrameAtIndex(0);
         
@@ -1029,6 +1034,7 @@ function simulateBreathing() {
         toggleBtn.style.display = "none";
         connectBtn.style.display = "none";
         paletteToggleBtn.style.display = "none";
+        fulllscreenBtn.style.display = "none";
 
         showFrameAtIndex(0);
 
@@ -1321,7 +1327,6 @@ resizeAllCanvases();
 
 function toggleFullscreen() {
     const elem = document.documentElement;
-    const button = document.getElementById('toggle-fullscreen-btn');
     const isFullscreen = document.fullscreenElement ||
                           document.webkitFullscreenElement ||
                           document.msFullscreenElement;
@@ -1337,7 +1342,7 @@ function toggleFullscreen() {
         } else if (elem.msRequestFullscreen) {
             elem.msRequestFullscreen();
         }
-        button.textContent = 'Fullscreen On';
+        fulllscreenBtn.textContent = 'Fullscreen On';
     } else {
         // EXIT fullscreen
         if (document.exitFullscreen) {
@@ -1347,7 +1352,7 @@ function toggleFullscreen() {
         } else if (document.msExitFullscreen) {
             document.msExitFullscreen();
         }
-        button.textContent = 'Fullscreen Off';
+        fulllscreenBtn.textContent = 'Fullscreen Off';
     }
 
     handleResize();

@@ -16,7 +16,7 @@ class SmoothingFilter:
         smoothed_value = sum(self.data_window) / len(self.data_window)
         return smoothed_value
 
-# Create an instance of the smoothing filter with a window size of 5
+# Create an instance of the smoothing filter
 smoothing_filter = SmoothingFilter(window_size=20)
 
 # Global variable to store the latest breathing value

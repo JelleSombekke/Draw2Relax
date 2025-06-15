@@ -169,8 +169,8 @@ def run_pipeline(img, timestamp):
     growth_constant = 15000
 
     # Load the model once (outside of your draw loop)
-    model = YOLO("../circle_detection_model/runs/segment/train2/weights/best.pt")
-    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, project="../circle_detection_model/runs/segment", name="", exist_ok=True)
+    model = YOLO("trained_model/weights/best.pt")
+    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, exist_ok=True)
     padding = 5
     circular_structures = []
 

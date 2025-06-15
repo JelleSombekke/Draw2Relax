@@ -2,7 +2,7 @@ task: segment
 mode: train
 model: yolov8n-seg.pt
 data: data.yaml
-epochs: 100
+epochs: 150
 time: null
 patience: 100
 batch: 16
@@ -13,7 +13,7 @@ cache: false
 device: cpu
 workers: 8
 project: null
-name: train2
+name: train3
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -102,4 +102,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: /Users/jellesombekke/Downloads/MindSpace/circle_detection_model/runs/segment/train2
+save_dir: /Users/jellesombekke/Downloads/MindSpace/circle_detection_model/runs/segment/train3
