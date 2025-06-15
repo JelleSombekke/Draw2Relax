@@ -2,13 +2,13 @@
 
 ## Description
 
-Draw2Relax is an interactive WebUI application that integrates user-drawn sketches with real-time breathing sensor input. It uses machine learning to detect and process circular structures from drawings, enabling a unique, meditative experience that links creativity and relaxation. 
+Draw2Relax is an interactive WebUI application that integrates user-drawn sketches with real-time breathing sensor input. It uses machine learning and computer vision to process user's drawings, enabling a unique, meditative experience that links creativity and relaxation. 
 
 This application must be run locally, as GitHub Pages does not support the required back-end processing. For best results, set up a virtual environment, install the required dependencies, and run the application on your local machine.
 
 ### Document Descriptions
 ### Code
-- index.html: Contains the front-end HTML code for the WebUI. It is viewable on [Draw2Relax](https://jellesombekke.github.io/Draw2Relax/). Note: This file only includes front-end logic and does not support any back-end functionality.
+- index.html: Contains the front-end HTML code for the WebUI. It is viewable on [Draw2Relax](https://jellesombekke.github.io/Draw2Relax/). Note: This page only includes front-end logic and does not support any back-end functionality.
 - server.py: The primary back-end script powering the WebUI.
 - functions.py:  Includes core pipeline functions such as contour calculation and manipulation, contour refilling, and computing displacement fields for circular structures.
 - receive_breathing_sensor_data.py: Handles the reception, smoothing, and storage of breathing sensor data.
