@@ -9,14 +9,13 @@ import os
 import sys
 from datetime import datetime
 from ultralytics import YOLO
-import receive_breathing_sensor_data
+import breathing_sensor_handling
+from functions import make_circ_animation_frames
 import logging
 
 module_path = os.path.abspath(os.path.join('..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-
-from functions import make_circ_animation_frames
 
 latest_image_data = None
 new_drawing_available = False
@@ -33,6 +32,8 @@ class IgnoreGetBreathingDataFilter(logging.Filter):
     def filter(self, record):
         # Ignore certain logs
         if "GET /get-breathing-data" in record.getMessage():
+            return False
+        elif "GET /sample-breathing-data" in record.getMessage():
             return False
         elif "GET /new-drawing" in record.getMessage():
             return False
@@ -140,7 +141,7 @@ def clear_frames():
 def start_breathing_sensor():
     # Start the breathing sensor in a separate thread
     try:
-        receive_breathing_sensor_data.start_sensor_thread()
+        breathing_sensor_handling.start_sensor_thread()
         return jsonify({"status": "Sensor started"}), 200
     except Exception as e:
         print(f"Error: {e}")
@@ -149,17 +150,23 @@ def start_breathing_sensor():
 @app.route('/get-breathing-data', methods=['GET'])
 def get_breathing_data():
     # Fetch the latest breathing data from the global variable
-    value = receive_breathing_sensor_data.latest_breathing_value
+    value = breathing_sensor_handling.latest_breathing_value
+    unsmoothed_value = breathing_sensor_handling.latest_breathing_value_unsmoothed
+    breathing_sensor_handling.save_breathing_value(value, unsmoothed_value)
+    return jsonify({"breathing_value": value, "breathing_value_unsmoothed": unsmoothed_value})
 
-    # Save breathing data
-    # receive_breathing_sensor_data.save_breathing_value(value)
+@app.route('/sample-breathing-data', methods=['GET'])
+def sample_breathing_data():
+    # Fetch the latest breathing data from the global variable
+    value = breathing_sensor_handling.latest_breathing_value
+    unsmoothed_value = breathing_sensor_handling.latest_breathing_value_unsmoothed
+    return jsonify({"breathing_value": value, "breathing_value_unsmoothed": unsmoothed_value})
 
-    return jsonify({"breathing_value": value})
 
 @app.route('/stop-sensor', methods=['POST'])
 def stop_breathing_sensor():
     # Stop the sensor thread
-    receive_breathing_sensor_data.stop_sensor()
+    breathing_sensor_handling.stop_sensor()
     return jsonify({"status": "Sensor stopped"}), 200
 
 def run_pipeline(img, timestamp):
@@ -169,8 +176,8 @@ def run_pipeline(img, timestamp):
     growth_constant = 15000
 
     # Load the model once (outside of your draw loop)
-    model = YOLO("trained_model/weights/best.pt")
-    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, exist_ok=True)
+    model = YOLO("../circle_detection_model/runs/segment/train3/weights/best.pt")
+    results = model.predict(source=f"drawings/drawing_{timestamp}.png", save=False, project="../circle_detection_model/runs/segment", name="", exist_ok=True)
     padding = 5
     circular_structures = []
 

@@ -12,15 +12,21 @@
         canvas {
             display: block;
         }
-        #background {
+        #background-canvas {
             position: absolute;
             top: 0;
             left: 0;
             z-index: 0;
             pointer-events: none;
         }
-
-        #draw {
+        #glow-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+        #draw-canvas {
             position: absolute;
             top: 0;
             left: 0;
@@ -121,7 +127,6 @@
                         rgba(0, 0, 0, .12) 0 0px 12px 0 !important;
         }
 
-        /* Loading spinner styles */
         #spinner {
             position: fixed;
             top: 50%;
@@ -299,8 +304,9 @@
 </head>
 <body>
 
-<canvas id="background"></canvas>
-<canvas id="draw"></canvas>
+<canvas id="background-canvas"></canvas>
+<canvas id="glow-canvas"></canvas>
+<canvas id="draw-canvas"></canvas>
 
 <div id="toolbar">
     <button class="button-styled" role="button" onclick="clearCanvas()">Clear</button>
@@ -353,6 +359,7 @@
 <script>
 let laptopIP = null;
 
+// Canvases setups
 function setupCanvas(canvas, dpr) {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -366,14 +373,16 @@ function setupCanvas(canvas, dpr) {
     canvas.height = height * dpr;
 
     const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Scale all drawings
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return ctx;
 }
 
 const dpr = window.devicePixelRatio || 1;
-let canvas = document.getElementById('draw');
+let canvas = document.getElementById('draw-canvas');
 let ctx = setupCanvas(canvas, dpr);
-let bgCanvas = document.getElementById('background');
+let glowCanvas = document.getElementById('glow-canvas');
+let glowCtx = setupCanvas(glowCanvas, dpr);
+let bgCanvas = document.getElementById('background-canvas');
 let bgCtx = setupCanvas(bgCanvas, dpr);
 let offscreenCanvas = document.createElement('canvas');
 let offscreenCtx = setupCanvas(offscreenCanvas, dpr);
@@ -411,6 +420,12 @@ const palettes = {
 
 let chosenPalette = 'blues';
 let paletteDropdownOpen = false;
+let colorCounter = 0;
+let startColor = [180, 210, 255];
+let prevColor =[180, 210, 255];
+let startGlowColor = [100, 130, 255];
+let prevGlowColor = [100, 130, 255];
+let currentColorIndex = 0;
 
 // Populate dropdown options
 Object.entries(palettes).forEach(([name, colors]) => {
@@ -429,6 +444,14 @@ Object.entries(palettes).forEach(([name, colors]) => {
   option.addEventListener("click", () => {
     chosenPalette = name;
     selectedText.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    startColor = palettes[name].background[0];
+    startGlowColor = palettes[name].glow[0];
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    bgR = Math.round(startColor[0])
+    bgG = Math.round(startColor[1])
+    bgB = Math.round(startColor[2])
+    bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
     closeDropdown();
   });
 
@@ -444,7 +467,6 @@ paletteToggleBtn.addEventListener("click", (e) => {
   dropdownOptions.classList.toggle("open", paletteDropdownOpen);
 });
 
-// Close on outside click or touch
 document.addEventListener("click", () => closeDropdown());
 document.addEventListener("touchstart", (e) => {
   if (paletteDropdownOpen && !dropdownOptions.contains(e.target) && e.target !== paletteToggleBtn) {
@@ -491,12 +513,9 @@ const maxWindowSize = 20;
 let peakDetected = false;
 let valleyDetected = false;
 let frameImages = [];
-let colorCounter = 0;
-let startColor = [255, 255, 255];
-let prevColor = [255, 255, 255];
-let startGlowColor = [255, 255, 255];
-let prevGlowColor = [255, 255, 255];
 let blackPixels = null;
+let inhaleMax = null;
+let exhaleMin = null;
 
 const toggleModeBtn = document.getElementById('toggle-mode-btn');
 toggleModeBtn.addEventListener('click', () => {
@@ -524,7 +543,6 @@ window.addEventListener("beforeunload", (event) => {
     // Send a background POST to clear frames
     navigator.sendBeacon('/clear-frames');
 
-    // Optionally reset your local state
     colorCounter = 0;
     startColor = [255, 255, 255];
     prevColor = [255, 255, 255];
@@ -579,12 +597,12 @@ document.addEventListener('fullscreenchange', () => {
   }
 });
 
+// Check device logic
 function isIOS() {
   const ua = navigator.userAgent || navigator.vendor || window.opera;
   return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 }
 
-// Optional: You can also check for iPadOS 13+ (which reports as Mac but with touch)
 function isIPadOS() {
   return (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
@@ -594,6 +612,8 @@ function isLaptop() {
   return !isIOS() && !isIPadOS() && !/Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+
+// Drawing logic
 function getPointFromEvent(e) {
     if (e.touches) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -602,7 +622,6 @@ function getPointFromEvent(e) {
     }
 }
 
-// ---- START DRAWING ----
 function startDrawing(e) {
     if (isDrawingDisabled) return;
     const point = getPointFromEvent(e);
@@ -641,7 +660,6 @@ function startDrawing(e) {
     e.preventDefault();
 }
 
-// ---- STOP DRAWING ----
 function stopDrawing(e) {
     if (isDrawingDisabled) return;
     if (!mousepadMode && drawing) {
@@ -661,7 +679,6 @@ function stopDrawing(e) {
     e.preventDefault();
 }
 
-// ---- DRAW MOVE ----
 function drawMove(e) {
     if (isDrawingDisabled || !drawing) return;
     const point = getPointFromEvent(e);
@@ -689,7 +706,7 @@ function drawMove(e) {
 }
 
 
-// Function to fetch sensor data from the Flask backend
+// Breathing Data Handling
 function fetchBreathingData() {
     fetch('/get-breathing-data')
         .then(res => res.json())
@@ -705,11 +722,13 @@ function fetchBreathingData() {
             previousBreathingValue = breathingValue;
 
             // Normalize and map to frame index
-            const minVal = 70;
-            const maxVal = 160;
+            // const minVal = 80
+            const minVal = exhaleMin;
+            // const maxVal = 130
+            const maxVal = inhaleMax;
             const normalized = Math.max(0, Math.min(1, (breathingValue - minVal) / (maxVal - minVal)));
             const index = Math.floor(normalized * (framePaths.length - 1));
-            console.log("Image index:", index);
+            console.log("Frame index", index, "Breathing value", breathingValue, "minVal", minVal, "maxVal", maxVal, "framePaths length:", framePaths.length)
             showFrameAtIndex(index);
 
             // Peak/trough detection
@@ -738,7 +757,84 @@ function fetchBreathingData() {
         .catch(err => console.error('Error fetching breathing data:', err));
 }
 
+async function getBreathingSample() {
+    return fetch('/sample-breathing-data')
+        .then(res => res.json())
+        .then(data => {
+            const val = data.breathing_value;
+            console.log('Sampled breathing value:', val);
+            return val;
+        })
+        .catch(err => {
+            console.error('Error fetching breathing data:', err);
+            return null;
+        });
+}
 
+function getAverageBreathingSample(sampleCount = 100, interval = 50) {
+    return new Promise((resolve) => {
+        const values = [];
+        const timer = setInterval(async () => {
+            const val = await getBreathingSample();
+            if (typeof val === 'number') {
+                values.push(val);
+            }
+            if (values.length >= sampleCount) {
+                clearInterval(timer);
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                resolve(avg);
+            }
+        }, interval);
+    });
+}
+
+async function calibrateBreathingSensor() {
+    const instructionEl = document.createElement('div');
+    Object.assign(instructionEl.style, {
+        position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white',
+        fontSize: '2rem', textAlign: 'center', zIndex: '10000', padding: '1rem',
+    });
+
+    const message = document.createElement('div');
+    instructionEl.appendChild(message);
+    document.body.appendChild(instructionEl);
+
+    function updateText(text) {
+        message.textContent = text;
+    }
+
+    function wait(ms) {
+        return new Promise(res => setTimeout(res, ms));
+    }
+
+    updateText("Please fully inhale and hold...");
+    await wait(6000);
+    let inhale = await getAverageBreathingSample(100, 50);
+    await wait(1000);
+
+    updateText("Now fully exhale and hold...");
+    await wait(6000);
+    let exhale = await getAverageBreathingSample(100, 50);
+    await wait(1000);
+
+    if (exhale >= (inhale - 20)) {
+        exhale = inhale - 20;
+    };
+
+    inhaleMax = inhale;
+    exhaleMin = exhale;
+
+    console.log("Calibration complete — Inhale Max:", inhale, "Exhale Min:", exhale);
+    updateText("Calibration complete.");
+    await wait(1500);
+
+    document.body.removeChild(instructionEl);
+}
+
+
+// Canvas Handling
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -751,6 +847,7 @@ function clearCanvas() {
     }
 
     bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    glowCtx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (breathingIntervalId !== null) {
         clearInterval(breathingIntervalId);
@@ -858,9 +955,16 @@ function redrawAll() {
             ctx.stroke();
         }
     }
+
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    bgR = Math.round(startColor[0])
+    bgG = Math.round(startColor[1])
+    bgB = Math.round(startColor[2])
+    bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 }
 
-
+// Preloading Animation Frames
 function preloadFrames() {
     return Promise.all(frameImages = framePaths.map((base64, i) => {
         return new Promise((resolve) => {
@@ -875,7 +979,7 @@ function preloadFrames() {
 
                 const imageData = offscreenCtx.getImageData(0, 0, img.width, img.height);
                 const minStep = 6;
-                const maxStep = 4;
+                const maxStep = 2;
                 const totalFrames = framePaths.length;
 
                 // Linearly interpolate step size
@@ -907,9 +1011,10 @@ function preloadFrames() {
 }
 
 
-function submitDrawing() {
+// Submit pipeline and Simulate pipeline
+async function submitDrawing() {
     if (!isLaptop()) {
-        sendDrawingToLaptop(); // Don't process locally on device
+        sendDrawingToLaptop();
         alert("Drawing sent to laptop for processing.");
         return;
     }
@@ -917,87 +1022,78 @@ function submitDrawing() {
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
 
+    // Disable UI
     submitBtn.disabled = true;
     clearBtn.disabled = true;
     undoBtn.disabled = true;
-    simulateBtn.disabled = true
+    simulateBtn.disabled = true;
     connectBtn.disabled = true;
     paletteToggleBtn.disabled = true;
-    isDrawingDisabled = true
+    isDrawingDisabled = true;
     spinnerBlock.style.display = 'block';
 
-    fetch('/process', {
-        method: 'POST',
-        body: JSON.stringify({ image: dataURL }),
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(response => {
-        framePaths = response.frames;
-        return preloadFrames();
-    })
-    .then(loadedImages => {
-        frameImages = loadedImages;
+    try {
+        // Start processing immediately
+        const processingPromise = fetch('/process', {
+            method: 'POST',
+            body: JSON.stringify({ image: dataURL }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(response => {
+                framePaths = response.frames;
+                return preloadFrames();
+            })
+            .then(loadedImages => {
+                frameImages = loadedImages;
+            });
 
-        framePaths = response.frames;
-        preloadFrames();
+        // Wait for the sensor to be activated before calibration
+        await fetch('/run-sensor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
 
+        breathingSensorActive = true;
+        updateSensorStatus();
+
+        // Now calibrate the sensor (in parallel with processing)
+        const calibrationPromise = calibrateBreathingSensor();
+
+        // Wait for both to finish
+        await Promise.all([processingPromise, calibrationPromise]);
+
+        // UI after everything is ready
         spinnerBlock.style.display = 'none';
         submitBtn.style.display = 'none';
         undoBtn.style.display = 'none';
         toggleBtn.style.display = "none";
         simulateBtn.style.display = "none";
         connectBtn.style.display = "none";
-        paletteToggleBtn.disabled =  "none";
+        paletteToggleBtn.style.display = "none";
         fulllscreenBtn.style.display = "none";
 
         showFrameAtIndex(0);
-        
-        submitBtn.disabled = false;
-        clearBtn.disabled = false;
-        undoBtn.disabled = false;
-        simulateBtn.disabled = false
-        connectBtn.disabled = false;
-        paletteToggleBtn.disabled = false;
+        updateColorCycle();
 
-        fetch('/run-sensor', {
-            method: 'POST',
-            body: JSON.stringify({}),
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(response => {
-            breathingSensorActive = true;
-            updateSensorStatus();
-            breathingIntervalId = setInterval(fetchBreathingData, 200);
-        })
-        .catch(err => {
-            console.error('Error during sensor activating:', err);
-            spinnerBlock.style.display = 'none';
-            submitBtn.disabled = false;
-            clearBtn.disabled = false;
-            undoBtn.disabled = false;
-            simulateBtn.disabled = false
-            connectBtn.disabled = false;
-            paletteToggleBtn.disabled = false;
-    
-            isDrawingDisabled = false
-            alert("Something went wrong. Please try again.");
-        })
-    })
-    .catch(err => {
-        console.error('Error during image processing:', err);
+        // Start breathing data updates
+        breathingIntervalId = setInterval(fetchBreathingData, 50);
+
+    } catch (err) {
+        console.error('Error during setup:', err);
+        alert("Something went wrong. Please try again.");
+    } finally {
+        // Re-enable controls
         spinnerBlock.style.display = 'none';
         submitBtn.disabled = false;
         clearBtn.disabled = false;
         undoBtn.disabled = false;
-        simulateBtn.disabled = false
+        simulateBtn.disabled = false;
         connectBtn.disabled = false;
         paletteToggleBtn.disabled = false;
-
-        isDrawingDisabled = false
-        alert("Something went wrong. Please try again.");
-    });
+        isDrawingDisabled = false;
+    }
 }
 
 function simulateBreathing() {
@@ -1037,6 +1133,7 @@ function simulateBreathing() {
         fulllscreenBtn.style.display = "none";
 
         showFrameAtIndex(0);
+        updateColorCycle();
 
         submitBtn.disabled = false;
         clearBtn.disabled = false;
@@ -1047,11 +1144,11 @@ function simulateBreathing() {
 
         // --- Simulation Setup ---
         const n_frames = framePaths.length;
-        const duration_sec = 100;
+        const duration_sec = 300;
         const sampling_rate = 200;
         const total_samples = duration_sec * sampling_rate;
 
-        const breathing_rate_per_min = 30; // You can adjust this
+        const breathing_rate_per_min = 12;
         const breath_cycles = (breathing_rate_per_min / 60) * duration_sec;
 
         const minVal = 70;
@@ -1059,7 +1156,29 @@ function simulateBreathing() {
 
         const t_interp = Array.from({ length: total_samples }, (_, i) => i / sampling_rate);
         const freq = breath_cycles / duration_sec; // cycles per second
-        const rr_interp = t_interp.map(t => Math.sin(2 * Math.PI * freq * t));
+        const rr_interp = t_interp.map(t => {
+            const cycle_duration = 1 / freq;
+            const phase = t % cycle_duration;
+
+            const inhale_time = 0.4 * cycle_duration;
+            const hold_in_time = 0.1 * cycle_duration;
+            const exhale_time = 0.4 * cycle_duration;
+            const hold_out_time = 0.1 * cycle_duration;
+
+            if (phase < inhale_time) {
+                // Inhale (ramp up)
+                return phase / inhale_time;
+            } else if (phase < inhale_time + hold_in_time) {
+                // Hold after inhale
+                return 1;
+            } else if (phase < inhale_time + hold_in_time + exhale_time) {
+                // Exhale (ramp down)
+                return 1 - ((phase - inhale_time - hold_in_time) / exhale_time);
+            } else {
+                // Hold after exhale
+                return 0;
+            }
+        });
 
         const min = Math.min(...rr_interp);
         const max = Math.max(...rr_interp);
@@ -1098,11 +1217,11 @@ function simulateBreathing() {
             if (previousValues.length > maxWindowSize) previousValues.shift();
 
             if (previousValues.length === maxWindowSize) {
-                const midIndex = Math.floor(maxWindowSize / 2);
-                const midValue = previousValues[midIndex];
+                const lastIndex = maxWindowSize - 1;
+                const lastValue = previousValues[lastIndex];
 
-                const isPeak = previousValues.every((v, i) => i === midIndex || v < midValue);
-                const isValley = previousValues.every((v, i) => i === midIndex || v > midValue);
+                const isPeak = lastValue === 160 && previousValues.every((v, i) => i === lastIndex || v < lastValue);
+                const isValley = lastValue === 70 && previousValues.every((v, i) => i === lastIndex || v > lastValue);
 
                 if (isPeak && !peakDetected) {
                     peakDetected = true;
@@ -1134,6 +1253,7 @@ function simulateBreathing() {
 }
 
 
+// Animation logic 
 function showFrameAtIndex(targetIndex) {
     if (!frameImages.length || targetIndex < 0 || targetIndex >= frameImages.length) return;
     if (isAnimating || targetIndex === global_index) return;
@@ -1154,7 +1274,10 @@ function showFrameAtIndex(targetIndex) {
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
-        animateBackgroundColor(targetIndex, prevColor, startColor, 5000);
+        // console.log("Image index:", global_index);
+
+        drawGlowForFrame(global_index)
+        animateBackgroundColor(prevColor, startColor, 1000);
 
         if (global_index !== targetIndex) {
             setTimeout(animateStep, 10); // smooth step
@@ -1179,61 +1302,99 @@ function getDoodleLength() {
 }
 
 function updateColorCycle() {
-    const paletteObj = palettes[chosenPalette]
+    const paletteObj = palettes[chosenPalette];
     const bgPalette = paletteObj.background;
     const glowPalette = paletteObj.glow;
 
-    const blendFactor = 0.05;
+    const blendFactor = 0.25;
 
-    // Background color update
-    const nextColor = bgPalette[colorCounter % bgPalette.length];
+    const nextIndex = (currentColorIndex + 1) % bgPalette.length;
+    const nextColor = bgPalette[nextIndex];
+    const nextGlowColor = glowPalette[nextIndex];
+
     prevColor = [...startColor];
-    startColor = [
-        Math.round(startColor[0] * (1 - blendFactor) + nextColor[0] * blendFactor),
-        Math.round(startColor[1] * (1 - blendFactor) + nextColor[1] * blendFactor),
-        Math.round(startColor[2] * (1 - blendFactor) + nextColor[2] * blendFactor)
-    ];
-
-    // Glow color update (from separate palette)
-    const nextGlowColor = glowPalette[colorCounter % glowPalette.length];
     prevGlowColor = [...startGlowColor];
-    startGlowColor = [
-        Math.round(startGlowColor[0] * (1 - blendFactor) + nextGlowColor[0] * blendFactor),
-        Math.round(startGlowColor[1] * (1 - blendFactor) + nextGlowColor[1] * blendFactor),
-        Math.round(startGlowColor[2] * (1 - blendFactor) + nextGlowColor[2] * blendFactor)
-    ];
 
-    colorCounter++;
+    // Blend without rounding
+    startColor = startColor.map((c, i) =>
+        c * (1 - blendFactor) + nextColor[i] * blendFactor
+    );
+
+    startGlowColor = startGlowColor.map((c, i) =>
+        c * (1 - blendFactor) + nextGlowColor[i] * blendFactor
+    );
+
+    // Compute squared distance to avoid rounding errors
+    const colorDistanceSq = startColor.reduce((sum, c, i) => sum + Math.pow(c - nextColor[i], 2), 0);
+    const glowDistanceSq = startGlowColor.reduce((sum, c, i) => sum + Math.pow(c - nextGlowColor[i], 2), 0);
+
+    // Threshold (squared distance): 1^2 = 1
+    if (colorDistanceSq < 1 && glowDistanceSq < 1) {
+        currentColorIndex = nextIndex;
+        console.log("Advanced to color index:", currentColorIndex);
+    }
+
+    console.log(
+        "startColor:",
+        startColor.map(Math.round),
+        "→ target:",
+        nextColor
+    );
+}
+
+function drawGlowForFrame(targetIndex, radius = 10, t = 1) {
+    const img = frameImages[targetIndex];
+    const blackPixels = img.blackPixelsCache;
+    if (!blackPixels) return;
+    
+
+    const glowR = Math.round(prevGlowColor[0] + (startGlowColor[0] - prevGlowColor[0]) * t);
+    const glowG = Math.round(prevGlowColor[1] + (startGlowColor[1] - prevGlowColor[1]) * t);
+    const glowB = Math.round(prevGlowColor[2] + (startGlowColor[2] - prevGlowColor[2]) * t);
+    const glowColor = [glowR, glowG, glowB];
+
+    glowCtx.clearRect(0, 0, canvas.width, canvas.height);
+    glowCtx.save();
+    glowCtx.globalAlpha = 0.9;
+    radius = radius * (targetIndex / (framePaths.length - 1)) + 5
+
+    const adjustedRadius = radius * dpr;
+    const glowStamp = createGlowStamp(glowColor, adjustedRadius);
+
+    const offsetX = Math.sin(1 * 0.5) * 10;
+    const offsetY = Math.cos(1 * 0.5) * 10;
+
+    blackPixels.forEach(({ x, y }) => {
+        const sx = (x + offsetX) / dpr;
+        const sy = (y + offsetY) / dpr;
+
+        glowCtx.drawImage(glowStamp, sx - adjustedRadius, sy - adjustedRadius);
+    });
+
+    glowCtx.restore();
 }
 
 function createGlowStamp(color, radius) {
     const size = radius * 2;
-    const glowCanvas = document.createElement('canvas');
-    glowCanvas.width = glowCanvas.height = size;
-    const glowCtx = glowCanvas.getContext('2d');
+    const glowstampCanvas = document.createElement('canvas');
+    glowstampCanvas.width = glowstampCanvas.height = size;
+    const glowstampCtx = glowstampCanvas.getContext('2d');
 
     const [r, g, b] = color;
-    const gradient = glowCtx.createRadialGradient(
+    const gradient = glowstampCtx.createRadialGradient(
         radius, radius, 0,
         radius, radius, radius
     );
     gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
     gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
-    glowCtx.fillStyle = gradient;
-    glowCtx.fillRect(0, 0, size, size);
+    glowstampCtx.fillStyle = gradient;
+    glowstampCtx.fillRect(0, 0, size, size);
 
-    return glowCanvas;
+    return glowstampCanvas;
 }
 
-function animateBackgroundColor(targetIndex, startColor, endColor, duration = 5000) {
-    const doodleImg = frameImages[targetIndex];
-    if (!doodleImg || !doodleImg.complete || !doodleImg.blackPixelsCache) {
-        setTimeout(() => animateBackgroundColor(targetIndex, startColor, endColor, duration), 10);
-        return;
-    }
-
-    blackPixels = doodleImg.blackPixelsCache;
+function animateBackgroundColor(startColor, endColor, duration = 5000) {
     let startTime = null;
     isAnimatingBackground = true;
 
@@ -1241,29 +1402,6 @@ function animateBackgroundColor(targetIndex, startColor, endColor, duration = 50
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
     }
-
-    function drawLayeredStrokes(color, layerCount = 2, radius = 15) {
-        bgCtx.save();
-        bgCtx.globalAlpha = 0.9;
-        radius = radius * (targetIndex / (framePaths.length - 1)) + 5
-
-        const adjustedRadius = radius * dpr;
-        const glowStamp = createGlowStamp(color, adjustedRadius);
-
-        for (let l = 0; l < layerCount; l++) {
-            const offsetX = Math.sin(l * 0.5) * 10;
-            const offsetY = Math.cos(l * 0.5) * 10;
-
-            blackPixels.forEach(({ x, y }) => {
-                const sx = (x + offsetX) / dpr;
-                const sy = (y + offsetY) / dpr;
-
-                bgCtx.drawImage(glowStamp, sx - adjustedRadius, sy - adjustedRadius);
-            });
-        }
-        bgCtx.restore();
-    }
-
 
     function animate(time) {
         if (!isAnimatingBackground) return;
@@ -1274,12 +1412,6 @@ function animateBackgroundColor(targetIndex, startColor, endColor, duration = 50
 
         bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
 
-        // Interpolate glow color ahead of background
-        const glowR = Math.round(prevGlowColor[0] + (startGlowColor[0] - prevGlowColor[0]) * t);
-        const glowG = Math.round(prevGlowColor[1] + (startGlowColor[1] - prevGlowColor[1]) * t);
-        const glowB = Math.round(prevGlowColor[2] + (startGlowColor[2] - prevGlowColor[2]) * t);
-        const glowColor = [glowR, glowG, glowB];
-
         // Interpolate background color normally
         const bgR = Math.round(startColor[0] + (endColor[0] - startColor[0]) * t);
         const bgG = Math.round(startColor[1] + (endColor[1] - startColor[1]) * t);
@@ -1288,8 +1420,6 @@ function animateBackgroundColor(targetIndex, startColor, endColor, duration = 50
         // Fill background with interpolated color
         bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
         bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-
-        drawLayeredStrokes(glowColor);
 
         if (t < 1) {
             animationFrameId = requestAnimationFrame(animate);
@@ -1314,6 +1444,7 @@ function updateSensorStatus() {
 }
 
 
+// Resizing logic
 function resizeAllCanvases() {
     ctx = setupCanvas(canvas, dpr);
     bgCtx = setupCanvas(bgCanvas, dpr);
@@ -1359,6 +1490,7 @@ function toggleFullscreen() {
 }
 
 
+// Device connect logic with QR-Code
 function fetchLaptopIP() {
     return fetch('/ip')
         .then(res => res.json())
