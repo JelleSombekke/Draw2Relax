@@ -49,6 +49,10 @@ def get_ip():
     local_ip = socket.gethostbyname(hostname)
     return jsonify({"ip": local_ip})
 
+@app.route("/ping")
+def ping():
+    return jsonify({"status": "ok"})
+
 @app.route('/qrcode')
 def generate_qr():
     hostname = socket.gethostname()
