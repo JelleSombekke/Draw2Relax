@@ -86,7 +86,12 @@ def draw_contours(reconstructed_contours, img, mode=None):
         # Create masks
         mask_inside = np.zeros_like(img, dtype=np.uint8)
         cv2.drawContours(mask_inside, [contour], -1, 255, thickness=cv2.FILLED)
-        mask_dilated = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=2)
+
+        perimeter = cv2.arcLength(contour, True)
+        if perimeter > 5000:
+            mask_dilated = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=4)
+        else:
+            mask_dilated = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=2)
 
         # Get outside mask = dilated - original
         mask_outside = cv2.subtract(mask_dilated, mask_inside)
@@ -163,7 +168,7 @@ def compute_displacement_fields(img, precomputed, scale, falloff=2.5):
     return warped, dx_final, dy_final
 
 
-def make_animation_frames(img, start_N, end_N, n_iterations, growth_constant, location='Animation_img', mode=None):
+def make_animation_frames(img, start_N, end_N, n_iterations, growth_constant, location='static/guidance_flow_img', mode=None):
     # clear animation img folder
     folder = f'./{location}'
     base64_frames = []
@@ -202,9 +207,13 @@ def make_animation_frames(img, start_N, end_N, n_iterations, growth_constant, lo
             plt.axis('off')
             plt.savefig(f'{location}/{i:003}.png', bbox_inches='tight', pad_inches=0)
             plt.close()
+            base64_img = encode_image_to_base64(output_canvas)
+            base64_frames.append(base64_img)
         elif mode == 'folder':
             frame_path = os.path.join(folder, f"{i:003}.png")
             cv2.imwrite(frame_path, output_canvas)
+            base64_img = encode_image_to_base64(output_canvas)
+            base64_frames.append(base64_img)
         else:
             base64_img = encode_image_to_base64(output_canvas)
             base64_frames.append(base64_img)
@@ -213,7 +222,7 @@ def make_animation_frames(img, start_N, end_N, n_iterations, growth_constant, lo
 
 
 
-def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, precomputed, location='Animation_circ_img', mode=None):
+def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, precomputed, location='static/guidance_flow_img', mode=None):
     # clear animation img folder
     folder = f'./{location}'
     base64_frames = []
@@ -254,9 +263,13 @@ def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constan
             plt.axis('off')
             plt.savefig(f'{location}/{i:003}.png', bbox_inches='tight', pad_inches=0)
             plt.close()
+            base64_img = encode_image_to_base64(output_canvas)
+            base64_frames.append(base64_img)
         elif mode == 'folder':
             frame_path = os.path.join(folder, f"{i:003}.png")
             cv2.imwrite(frame_path, output_canvas)
+            base64_img = encode_image_to_base64(output_canvas)
+            base64_frames.append(base64_img)
         else:
             base64_img = encode_image_to_base64(output_canvas)
             base64_frames.append(base64_img)

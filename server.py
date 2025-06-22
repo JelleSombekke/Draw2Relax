@@ -221,7 +221,6 @@ def run_pipeline(img, timestamp):
         precomputed.append((dx, dy, dist, rx, ry))
 
     base64_frames, file_path_list = make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, precomputed, location='static/guidance_flow_img', mode=None)
-
     return base64_frames, file_path_list
 
 if __name__ == '__main__':
