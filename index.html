@@ -422,7 +422,7 @@ let chosenPalette = 'blues';
 let paletteDropdownOpen = false;
 let colorCounter = 0;
 let startColor = [180, 210, 255];
-let prevColor =[180, 210, 255];
+let prevColor = [180, 210, 255];
 let startGlowColor = [100, 130, 255];
 let prevGlowColor = [100, 130, 255];
 let currentColorIndex = 0;
@@ -533,7 +533,6 @@ window.addEventListener('DOMContentLoaded', () => {
   } else {
     toggleBtn.style.display = 'none';
     qrBtn.style.display = 'none';
-    paletteToggleBtn.style.display = 'none';
     simulateBtn.style.display = 'none';
     sensorStatus.style.display = 'none';
   }
@@ -833,6 +832,19 @@ async function calibrateBreathingSensor() {
     document.body.removeChild(instructionEl);
 }
 
+function updateSensorStatus() {
+    const statusText = document.getElementById("status-text");
+    const statusLight = document.getElementById("status-light");
+
+    if (breathingSensorActive) {
+        statusText.textContent = "Breathing Sensor Active";
+        statusLight.style.backgroundColor = "green";
+    } else {
+        statusText.textContent = "Breathing Sensor Inactive";
+        statusLight.style.backgroundColor = "red";
+    }
+}
+
 
 // Canvas Handling
 function clearCanvas() {
@@ -881,10 +893,10 @@ function clearCanvas() {
     isDrawingDisabled = false;
     isAnimatingBackground = false;
     colorCounter = 0;
-    startColor = [255, 255, 255];
-    prevColor = [255, 255, 255];
-    startGlowColor = [255, 255, 255];
-    prevGlowColor = [255, 255, 255];
+    startColor = palettes[chosenPalette].background[0];
+    startGlowColor = palettes[chosenPalette].glow[0];
+    prevColor = palettes[chosenPalette].background[0];
+    prevGlowColor =  palettes[chosenPalette].glow[0];
     blackPixels = null;
     frameImages = [];
 
@@ -955,14 +967,8 @@ function redrawAll() {
             ctx.stroke();
         }
     }
-
-    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-    bgR = Math.round(startColor[0])
-    bgG = Math.round(startColor[1])
-    bgB = Math.round(startColor[2])
-    bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
-    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 }
+
 
 // Preloading Animation Frames
 function preloadFrames() {
@@ -1042,6 +1048,7 @@ async function submitDrawing() {
             .then(res => res.json())
             .then(response => {
                 framePaths = response.frames;
+                console.log("Done processing frames")
                 return preloadFrames();
             })
             .then(loadedImages => {
@@ -1063,6 +1070,7 @@ async function submitDrawing() {
 
         // Wait for both to finish
         await Promise.all([processingPromise, calibrationPromise]);
+        console.log("Done processing all")
 
         // UI after everything is ready
         spinnerBlock.style.display = 'none';
@@ -1331,18 +1339,13 @@ function updateColorCycle() {
     // Threshold (squared distance): 1^2 = 1
     if (colorDistanceSq < 1 && glowDistanceSq < 1) {
         currentColorIndex = nextIndex;
-        console.log("Advanced to color index:", currentColorIndex);
+        // console.log("Advanced to color index:", currentColorIndex);
     }
 
-    console.log(
-        "startColor:",
-        startColor.map(Math.round),
-        "→ target:",
-        nextColor
-    );
+    // console.log("startColor:", startColor.map(Math.round), "→ target:", nextColor);
 }
 
-function drawGlowForFrame(targetIndex, radius = 10, t = 1) {
+function drawGlowForFrame(targetIndex, radius = 10, alpha = 0.9, t = 1) {
     const img = frameImages[targetIndex];
     const blackPixels = img.blackPixelsCache;
     if (!blackPixels) return;
@@ -1355,7 +1358,7 @@ function drawGlowForFrame(targetIndex, radius = 10, t = 1) {
 
     glowCtx.clearRect(0, 0, canvas.width, canvas.height);
     glowCtx.save();
-    glowCtx.globalAlpha = 0.9;
+    glowCtx.globalAlpha = alpha;
     radius = radius * (targetIndex / (framePaths.length - 1)) + 5
 
     const adjustedRadius = radius * dpr;
@@ -1430,28 +1433,21 @@ function animateBackgroundColor(startColor, endColor, duration = 5000) {
     animationFrameId = requestAnimationFrame(animate);
 }
 
-function updateSensorStatus() {
-    const statusText = document.getElementById("status-text");
-    const statusLight = document.getElementById("status-light");
-
-    if (breathingSensorActive) {
-        statusText.textContent = "Breathing Sensor Active";
-        statusLight.style.backgroundColor = "green";
-    } else {
-        statusText.textContent = "Breathing Sensor Inactive";
-        statusLight.style.backgroundColor = "red";
-    }
-}
-
 
 // Resizing logic
 function resizeAllCanvases() {
     ctx = setupCanvas(canvas, dpr);
     bgCtx = setupCanvas(bgCanvas, dpr);
+    glowCtx = setupCanvas(glowCanvas, dpr)
     redrawAll();
-    if (typeof reapplyBackground === 'function') {
-        reapplyBackground(bgCtx); // Optional: restore background visuals
-    }
+    startColor = palettes[chosenPalette].background[0];
+    startGlowColor = palettes[chosenPalette].glow[0];
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    bgR = Math.round(startColor[0])
+    bgG = Math.round(startColor[1])
+    bgB = Math.round(startColor[2])
+    bgCtx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 }
 window.addEventListener('resize', resizeAllCanvases);
 resizeAllCanvases();

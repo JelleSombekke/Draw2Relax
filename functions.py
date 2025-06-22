@@ -115,54 +115,43 @@ def draw_contours(reconstructed_contours, img, mode=None):
     elif mode == None:
         return output_canvas
     
-def compute_displacement_fields(img, circular_structures, scale=1.5, falloff=2.5):
+def compute_displacement_fields(img, precomputed, scale, falloff=2.5):
     h, w = img.shape[:2]
-    Y, X = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
+    Y, X = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')  # could also be passed in
 
-    num_shapes = len(circular_structures)
-    dx_fields = np.zeros((num_shapes, h, w), dtype=np.float32)
-    dy_fields = np.zeros((num_shapes, h, w), dtype=np.float32)
-    weights = np.zeros((num_shapes, h, w), dtype=np.float32)
+    dx_combined = np.zeros((h, w), dtype=np.float32)
+    dy_combined = np.zeros((h, w), dtype=np.float32)
+    total_weight = np.zeros((h, w), dtype=np.float32)
 
-    for idx, (cx, cy, rx, ry) in enumerate(circular_structures):
-        dx = X - cx
-        dy = Y - cy
-
-        norm_dx = dx / rx
-        norm_dy = dy / ry
-        dist = np.sqrt(norm_dx**2 + norm_dy**2)
-
+    for (dx, dy, dist, rx, ry) in precomputed:
         inner_mask = dist <= 1.0
         outer_mask = (dist > 1.0) & (dist <= falloff)
+
+        if not np.any(inner_mask | outer_mask):
+            continue
 
         disp_x = np.zeros_like(dx, dtype=np.float32)
         disp_y = np.zeros_like(dy, dtype=np.float32)
         influence = np.zeros_like(dx, dtype=np.float32)
 
-        # --- Inner region: scale uniformly inside the ellipse
         if np.any(inner_mask):
             disp_x[inner_mask] = -dx[inner_mask] * (scale - 1.0)
             disp_y[inner_mask] = -dy[inner_mask] * (scale - 1.0)
             influence[inner_mask] = 1.0
 
-        # --- Outer transition zone: push outward with cosine falloff
         if np.any(outer_mask):
-            t = (dist[outer_mask] - 1.0) / (falloff - 1.0)  # 0 at edge, 1 at falloff
-            falloff_strength = 0.5 * (1 + np.cos(np.pi * t))  # smoothstep: 1→0
-            norm = np.maximum(np.sqrt(dx[outer_mask]**2 + dy[outer_mask]**2), 1e-6)
+            t = (dist[outer_mask] - 1.0) / (falloff - 1.0)
+            falloff_strength = 0.5 * (1 + np.cos(np.pi * t))
+            norm = np.hypot(dx[outer_mask], dy[outer_mask])
+            norm = np.maximum(norm, 1e-6)
 
             disp_x[outer_mask] = -dx[outer_mask] / norm * (scale - 1.0) * falloff_strength * rx
             disp_y[outer_mask] = -dy[outer_mask] / norm * (scale - 1.0) * falloff_strength * ry
-
             influence[outer_mask] = falloff_strength
 
-        dx_fields[idx] = disp_x * influence
-        dy_fields[idx] = disp_y * influence
-        weights[idx] = influence
-
-    total_weight = np.sum(weights, axis=0)
-    dx_combined = np.sum(dx_fields, axis=0)
-    dy_combined = np.sum(dy_fields, axis=0)
+        dx_combined += disp_x * influence
+        dy_combined += disp_y * influence
+        total_weight += influence
 
     dx_final = np.divide(dx_combined, total_weight, out=np.zeros_like(dx_combined), where=total_weight > 0)
     dy_final = np.divide(dy_combined, total_weight, out=np.zeros_like(dy_combined), where=total_weight > 0)
@@ -224,7 +213,7 @@ def make_animation_frames(img, start_N, end_N, n_iterations, growth_constant, lo
 
 
 
-def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, circles_structures, location='Animation_circ_img', mode=None):
+def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, precomputed, location='Animation_circ_img', mode=None):
     # clear animation img folder
     folder = f'./{location}'
     base64_frames = []
@@ -253,7 +242,7 @@ def make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constan
     # Iterate over different descriptor counts
     for i, desc in enumerate(descriptor_values):
 
-        img_warped, _, _ = compute_displacement_fields(img, circles_structures, scale[i], falloff=2.5)
+        img_warped, _, _ = compute_displacement_fields(img, precomputed, scale[i], falloff=2.5)
         reconstructed_contours = calculate_contours(img_warped, desc, growth_constant, mode=None)
 
         # Draw contours

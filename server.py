@@ -203,7 +203,20 @@ def run_pipeline(img, timestamp):
 
                 circular_structures.append((cx, cy, rx, ry))
 
-    base64_frames, file_path_list = make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, circular_structures, location='static/guidance_flow_img', mode=None)
+    h, w = img.shape[:2]
+    Y, X = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
+
+    # Precompute ellipse masks for all structures
+    precomputed = []
+    for (cx, cy, rx, ry) in circular_structures:
+        dx = X - cx
+        dy = Y - cy
+        norm_dx = dx / rx
+        norm_dy = dy / ry
+        dist = np.sqrt(norm_dx**2 + norm_dy**2)
+        precomputed.append((dx, dy, dist, rx, ry))
+
+    base64_frames, file_path_list = make_circ_animation_frames(img, start_N, end_N, n_iterations, growth_constant, precomputed, location='static/guidance_flow_img', mode=None)
 
     return base64_frames, file_path_list
 
