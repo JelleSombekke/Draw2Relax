@@ -488,7 +488,6 @@ const simulateBtn = document.querySelector('button[onclick="simulateBreathing()"
 const toggleBtn = document.getElementById("toggle-mode-btn")
 const connectBtn = document.getElementById('show-qr-btn');
 const sensorStatus = document.getElementById('sensor-status');
-const qrBtn = document.getElementById('show-qr-btn');
 const fulllscreenBtn = document.getElementById('toggle-fullscreen-btn');
 
 let framePaths = []; 
@@ -525,14 +524,14 @@ toggleModeBtn.addEventListener('click', () => {
 
 window.addEventListener('DOMContentLoaded', () => {
   if (isLaptop()) {
-    qrBtn.addEventListener('click', showQRModal);
+    connectBtn.addEventListener('click', showQRModal);
     toggleBtn.style.display = 'inline-block';
-    qrBtn.style.display = 'inline-block';
+    connectBtn.style.display = 'inline-block';
     paletteToggleBtn.style.display = 'inline-block';
     simulateBtn.style.display = 'inline-block';
   } else {
     toggleBtn.style.display = 'none';
-    qrBtn.style.display = 'none';
+    connectBtn.style.display = 'none';
     simulateBtn.style.display = 'none';
     sensorStatus.style.display = 'none';
   }
@@ -1025,6 +1024,9 @@ async function submitDrawing() {
         return;
     }
 
+    const backendAvailable = await checkBackendAvailability();
+    if (!backendAvailable) return;
+
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
 
@@ -1104,7 +1106,10 @@ async function submitDrawing() {
     }
 }
 
-function simulateBreathing() {
+async function simulateBreathing() {
+    const backendAvailable = await checkBackendAvailability();
+    if (!backendAvailable) return;
+
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
 
@@ -1591,7 +1596,10 @@ function pollForNewDrawing() {
     });
 }
 
-function showQRModal() {
+async function showQRModal() {
+    const backendAvailable = await checkBackendAvailability();
+    if (!backendAvailable) return;
+
     fetch('/qrcode')
         .then(res => res.blob())
         .then(blob => {
@@ -1606,6 +1614,33 @@ function showQRModal() {
 
 function closeQRModal() {
     document.getElementById('qr-modal').style.display = 'none';
+}
+
+// Check backend access
+async function checkBackendAvailability() {
+    if (location.hostname.includes("github.io")) {
+        alert("This is a frontend-only demo. Backend features are not available.");
+        return false;
+    }
+
+    if (!laptopIP) {
+        await fetchLaptopIP();  // Try fetching IP if not already done
+    }
+
+    if (!laptopIP) {
+        alert("Unable to reach backend. Make sure it's running locally.");
+        return false;
+    }
+
+    try {
+        const res = await fetch(`http://${laptopIP}:5000/ping`);
+        if (!res.ok) throw new Error("Backend ping failed");
+        return true;
+    } catch (err) {
+        console.error("Backend unavailable:", err);
+        alert("Backend not reachable. This feature won't work.");
+        return false;
+    }
 }
 
 
