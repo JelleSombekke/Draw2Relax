@@ -29,7 +29,7 @@ The WebUI contains the following buttons:
 - Fullscreen: OFF: Toggles fullscreen (default: OFF).
 - Breathing Sensor Inactive: This displays if the breathing sensor is active or not (default: Inactive). (Unclickable, Button only exists on laptops)
 
-<img width="1512" alt="webUI" src="https://github.com/user-attachments/assets/633f5229-f878-4846-8780-c0a6fb86b222" />
+<img width="1512" alt="webUI" src="https://github.com/user-attachments/assets/0a4d6971-6126-4353-be78-b097eb4daf15" />
 
 
 ## Author
