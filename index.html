@@ -322,7 +322,7 @@
 
 </div>
 
-<button id="toggle-mode-btn">Mousepad Mode: OFF</button>
+<button id="toggle-mode-btn">Click Draw Mode: OFF</button>
 
 <button id="toggle-fullscreen-btn" onclick="toggleFullscreen();">Fullscreen Off</button>
 
@@ -393,12 +393,12 @@ const selectedText = document.getElementById("selected-palette");
 
 const palettes = {
     blues: {
-        background: [[180, 210, 255], [100, 150, 255], [130, 190, 255], [160, 220, 255]],
+        background: [[180, 210, 255], [160, 220, 255], [130, 190, 255], [100, 150, 255]],
         glow:       [[100, 130, 255], [80, 120, 250], [60, 100, 220], [40, 80, 200]]
     },
     reds: {
-        background: [[255, 150, 150], [255, 100, 100], [200, 70, 70], [230, 120, 120]],
-        glow:       [[255, 100, 180], [200, 50, 130], [150, 30, 100], [220, 90, 150]]
+        background: [[255, 150, 150], [230, 120, 120], [255, 100, 100], [200, 70, 70]],
+        glow:       [[255, 100, 180], [220, 90, 150], [200, 50, 130], [150, 30, 100]]
     },
     purples: {
         background: [[220, 200, 255], [200, 180, 255], [160, 130, 255], [120, 90, 220]],
@@ -415,6 +415,26 @@ const palettes = {
     forest: {
         background: [[200, 255, 200], [160, 220, 160], [120, 180, 120], [80, 140, 80]],
         glow:       [[140, 230, 140], [100, 190, 100], [70, 150, 70], [50, 110, 50]]
+    },
+    sunset: {
+        background: [[255, 200, 150], [255, 170, 120], [240, 130, 90], [200, 100, 70]],
+        glow:       [[255, 160, 100], [240, 120, 80], [220, 90, 60], [190, 70, 50]]
+    },
+    ocean: {
+        background: [[150, 220, 255], [100, 200, 240], [60, 170, 220], [30, 140, 200]],
+        glow:       [[80, 180, 230], [50, 150, 200], [30, 120, 170], [20, 90, 140]]
+    },
+    rose: {
+        background: [[255, 180, 200], [240, 130, 160], [220, 90, 130], [180, 60, 100]],
+        glow:       [[250, 130, 170], [220, 90, 140], [180, 60, 110], [150, 40, 90]]
+    },
+    grays: {
+        background: [[240, 240, 240], [200, 200, 200], [160, 160, 160], [120, 120, 120]],
+        glow:       [[220, 220, 220], [180, 180, 180], [140, 140, 140], [100, 100, 100]]
+    },
+    peach: {
+        background: [[255, 220, 190], [255, 200, 160], [255, 170, 130], [240, 140, 100]],
+        glow:       [[255, 190, 150], [255, 160, 120], [240, 130, 100], [220, 110, 80]]
     }
 };
 
@@ -516,10 +536,9 @@ let blackPixels = null;
 let inhaleMax = null;
 let exhaleMin = null;
 
-const toggleModeBtn = document.getElementById('toggle-mode-btn');
-toggleModeBtn.addEventListener('click', () => {
+toggleBtn.addEventListener('click', () => {
     mousepadMode = !mousepadMode;
-    toggleModeBtn.textContent = mousepadMode ? "Mousepad Mode: ON" : "Mousepad Mode: OFF";
+    toggleBtn.textContent = mousepadMode ? "Click Draw Mode: ON" : "Click Draw Mode: OFF";
 });
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -726,7 +745,6 @@ function fetchBreathingData() {
             const maxVal = inhaleMax;
             const normalized = Math.max(0, Math.min(1, (breathingValue - minVal) / (maxVal - minVal)));
             const index = Math.floor(normalized * (framePaths.length - 1));
-            console.log("Frame index", index, "Breathing value", breathingValue, "minVal", minVal, "maxVal", maxVal, "framePaths length:", framePaths.length)
             showFrameAtIndex(index);
 
             // Peak/trough detection
@@ -1347,7 +1365,7 @@ function updateColorCycle() {
         // console.log("Advanced to color index:", currentColorIndex);
     }
 
-    // console.log("startColor:", startColor.map(Math.round), "→ target:", nextColor);
+    console.log("startColor:", startColor.map(Math.round), "→ target:", nextColor);
 }
 
 function drawGlowForFrame(targetIndex, radius = 10, alpha = 0.9, t = 1) {

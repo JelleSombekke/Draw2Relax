@@ -84,21 +84,29 @@ def draw_contours(reconstructed_contours, img, mode=None):
 
     for contour in reconstructed_contours:
         # Create masks
+        perimeter = cv2.arcLength(contour, True)
         mask_inside = np.zeros_like(img, dtype=np.uint8)
         cv2.drawContours(mask_inside, [contour], -1, 255, thickness=cv2.FILLED)
-
-        perimeter = cv2.arcLength(contour, True)
-        if perimeter > 5000:
-            mask_dilated = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=4)
-        else:
-            mask_dilated = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=2)
+        
+        mask_dilated_4 = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=4)
+        mask_dilated_2 = cv2.dilate(mask_inside, np.ones((10, 10), np.uint8), iterations=2)
 
         # Get outside mask = dilated - original
-        mask_outside = cv2.subtract(mask_dilated, mask_inside)
+        mask_outside = cv2.subtract(mask_dilated_2, mask_inside)
 
         # Calculate mean intensity inside and outside
         mean_inside = cv2.mean(img, mask=mask_inside)[0]
         mean_outside = cv2.mean(img, mask=mask_outside)[0]
+
+        # Check if means are very close, if so use increased dilated inside mask
+        if abs(mean_inside - mean_outside) < 20:
+
+            # Get outside mask = dilated - original
+            mask_outside = cv2.subtract(mask_dilated_4, mask_inside)
+
+            # Calculate mean intensity inside and outside
+            mean_inside = cv2.mean(img, mask=mask_inside)[0]
+            mean_outside = cv2.mean(img, mask=mask_outside)[0]
 
         if mean_inside < mean_outside:
             # Inside is darker → draw black contour (visible)
@@ -119,7 +127,7 @@ def draw_contours(reconstructed_contours, img, mode=None):
 
     elif mode == None:
         return output_canvas
-    
+
 def compute_displacement_fields(img, precomputed, scale, falloff=2.5):
     h, w = img.shape[:2]
     Y, X = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')  # could also be passed in

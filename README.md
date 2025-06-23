@@ -25,7 +25,7 @@ The WebUI contains the following buttons:
 - Simulate: Submits the drawing for processing and simulates a breathing wave. (Button only exists on laptops)
 - Connect device: Pops up a QR-code so devices could connect to the laptops IP and submit drawings from the device towards the laptop. (Button only exists on laptops)
 - Palette: Blues: Selects the color palette for the pipeline (default: Blues). (Button only exists on laptops)
-- Mousepad Mode: OFF: Changes drawing logic to click to start and stop drawing (default: OFF). (Button only exists on laptops)
+- Click Draw Mode: OFF: Changes drawing logic to click to start and stop drawing (default: OFF). (Button only exists on laptops)
 - Fullscreen: OFF: Toggles fullscreen (default: OFF).
 - Breathing Sensor Inactive: This displays if the breathing sensor is active or not (default: Inactive). (Unclickable, Button only exists on laptops)
 
