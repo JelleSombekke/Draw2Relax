@@ -57,6 +57,20 @@ def receive_breathing_data():
     finally:
         ser.close()
 
+def is_sensor_connected(port='COM3', baudrate=9600, timeout=1):
+    try:
+        with serial.Serial(port, baudrate, timeout=timeout) as ser:
+            ser.write(bytes([0x20, 0x32]))
+            time.sleep(0.1)
+            data = ser.read(10)
+            return len(data) > 0
+    except serial.SerialException as e:
+        print(f"Serial error: {e}")
+        return False
+    except Exception as e:
+        print(f"General sensor check error: {e}")
+        return False
+
 def start_sensor_thread():
     global sensor_thread
     stop_event.clear()

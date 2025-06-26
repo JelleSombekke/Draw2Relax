@@ -778,7 +778,6 @@ async function getBreathingSample() {
         .then(res => res.json())
         .then(data => {
             const val = data.breathing_value;
-            console.log('Sampled breathing value:', val);
             return val;
         })
         .catch(err => {
@@ -1044,6 +1043,12 @@ async function submitDrawing() {
 
     const backendAvailable = await checkBackendAvailability();
     if (!backendAvailable) return;
+
+    const sensorAvailable = await checkSensorAvailability();
+    if (!sensorAvailable) {
+        alert("Breathing sensor not detected. Please connect the sensor and try again.");
+        return;
+    }
 
     const dataURL = canvas.toDataURL('image/png');
     submitted = true;
@@ -1605,7 +1610,7 @@ function pollForNewDrawing() {
     .then(res => res.json())
     .then(data => {
       if (data.new_drawing) {
-        console.log("New drawing detected! Loading...");
+        console.log("New drawing detected. Loading...");
         loadDrawing();
       }
     })
@@ -1634,7 +1639,7 @@ function closeQRModal() {
     document.getElementById('qr-modal').style.display = 'none';
 }
 
-// Check backend access
+// Checks
 async function checkBackendAvailability() {
     if (location.hostname.includes("github.io")) {
         alert("This is a frontend-only demo. Backend features are not available.");
@@ -1661,6 +1666,16 @@ async function checkBackendAvailability() {
     }
 }
 
+async function checkSensorAvailability() {
+    try {
+        const res = await fetch('/check-sensor');
+        const result = await res.json();
+        return result.sensorAvailable;
+    } catch (err) {
+        console.error("Sensor availability check failed:", err);
+        return false;
+    }
+}
 
 // Start polling every 3 seconds (only on laptop)
 if (isLaptop()) {

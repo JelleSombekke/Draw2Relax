@@ -166,6 +166,14 @@ def sample_breathing_data():
     unsmoothed_value = breathing_sensor_handling.latest_breathing_value_unsmoothed
     return jsonify({"breathing_value": value, "breathing_value_unsmoothed": unsmoothed_value})
 
+@app.route('/check-sensor', methods=['GET'])
+def check_sensor():
+    try:
+        available = breathing_sensor_handling.is_sensor_connected()
+        return jsonify({'sensorAvailable': bool(available)}), 200
+    except Exception as e:
+        print(f"Sensor check failed: {e}")
+        return jsonify({'sensorAvailable': False, 'error': str(e)}), 200
 
 @app.route('/stop-sensor', methods=['POST'])
 def stop_breathing_sensor():
