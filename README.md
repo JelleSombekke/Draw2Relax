@@ -31,6 +31,28 @@ The WebUI contains the following buttons:
 
 <img width="1512" alt="webUI" src="https://github.com/user-attachments/assets/0a4d6971-6126-4353-be78-b097eb4daf15" />
 
+## Running the System
+
+To run Draw2Relax on your local machine, follow these steps:
+
+Clone the Repository
+<pre>git clone https://github.com/JelleSombekke/Draw2Relax.git
+cd Draw2Relax</pre>
+
+Create a Virtual Environment (Recommended)
+<pre>python -m venv venv
+source venv/bin/activate   # On Windows use: venv\Scripts\activate</pre>
+
+
+Install Dependencies
+<pre>pip install -r requirements.txt</pre>
+
+Run the Backend Server
+<pre>python server.py</pre>
+
+Using the Breathing Sensor (Optional)
+- Connect the breathing sensor via a USB port. (Currently only compatible with the HKH-11C respiratory wave sensor)
+- Check which COM port the sensor is connected to, and update the script if needed. (Default is set to COM3 in receive_breathing_sensor_data.py)
 
 ## Author
 * Jelle Sombekke - jellesombekke@gmail.com
